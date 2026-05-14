@@ -1,13 +1,14 @@
 package telegram
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	tgBot "github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+
+	"github.com/pardnchiu/go-bot/tts"
 )
 
 type Input struct {
@@ -45,47 +46,20 @@ func (b *Bot) Send(ctx context.Context, chatID int64, text string) (*models.Mess
 	})
 }
 
-type FileType int
-
-const (
-	TypePhoto FileType = iota
-	TypeDocument
-)
-
-func (b *Bot) SendFile(ctx context.Context, chatID int64, fileType FileType, path string, caption ...string) (*models.Message, error) {
-	if path == "" {
-		return nil, fmt.Errorf("path is required")
-	}
-
-	file, err := os.Open(path)
+func (b *Bot) SendVoice(ctx context.Context, chatID int64, text, apiKey string, caption ...string) (*models.Message, error) {
+	ogg, err := tts.Get(ctx, apiKey, text)
 	if err != nil {
-		return nil, fmt.Errorf("os.Open: %w", err)
+		return nil, fmt.Errorf("tts.Get: %w", err)
 	}
-	defer file.Close()
-
-	upload := &models.InputFileUpload{
-		Filename: filepath.Base(path),
-		Data:     file,
+	params := &tgBot.SendVoiceParams{
+		ChatID: chatID,
+		Voice: &models.InputFileUpload{
+			Filename: "voice.ogg",
+			Data:     bytes.NewReader(ogg),
+		},
 	}
-	var captionStr string
 	if len(caption) > 0 {
-		captionStr = caption[0]
+		params.Caption = caption[0]
 	}
-
-	switch fileType {
-	case TypePhoto:
-		return b.api.SendPhoto(ctx, &tgBot.SendPhotoParams{
-			ChatID:  chatID,
-			Photo:   upload,
-			Caption: captionStr,
-		})
-	case TypeDocument:
-		return b.api.SendDocument(ctx, &tgBot.SendDocumentParams{
-			ChatID:   chatID,
-			Document: upload,
-			Caption:  captionStr,
-		})
-	default:
-		return nil, fmt.Errorf("unknown file type: %d", fileType)
-	}
+	return b.api.SendVoice(ctx, params)
 }

@@ -3,3 +3,5 @@ module github.com/pardnchiu/go-bot
 go 1.25.0
 
 require github.com/go-telegram/bot v1.20.0
+
+require github.com/pardnchiu/go-pkg v0.12.2

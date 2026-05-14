@@ -17,13 +17,12 @@ type Status struct {
 }
 
 type Bot struct {
-	api     *tgBot.Bot
-	mu      sync.Mutex
-	cancel  context.CancelFunc
-	done    chan struct{}
-	running bool
-	me      *models.User
-
+	api       *tgBot.Bot
+	mu        sync.Mutex
+	cancel    context.CancelFunc
+	done      chan struct{}
+	running   bool
+	me        *models.User
 	handlerMu sync.RWMutex
 	handler   ReplyHandler
 }
@@ -123,7 +122,10 @@ func (b *Bot) dispatch(ctx context.Context, _ *tgBot.Bot, update *models.Update)
 	}
 	slog.Info("telegram update",
 		slog.Int64("chatId", msg.Chat.ID),
-		slog.String("text", msg.Text))
+		slog.String("text", msg.Text),
+		slog.String("caption", msg.Caption),
+		slog.Int("photoCount", len(msg.Photo)),
+		slog.Bool("hasDocument", msg.Document != nil))
 
 	b.handlerMu.RLock()
 	handler := b.handler
@@ -139,6 +141,9 @@ func (b *Bot) dispatch(ctx context.Context, _ *tgBot.Bot, update *models.Update)
 		UserID:   userID,
 		Username: username,
 		Text:     msg.Text,
+		Caption:  msg.Caption,
+		Photo:    msg.Photo,
+		Document: msg.Document,
 		Raw:      update,
 	})
 	if reply == "" {

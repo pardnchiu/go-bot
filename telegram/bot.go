@@ -23,6 +23,9 @@ type Bot struct {
 	done    chan struct{}
 	running bool
 	me      *models.User
+
+	handlerMu sync.RWMutex
+	handler   ReplyHandler
 }
 
 func New(token string) (*Bot, error) {
@@ -120,13 +123,31 @@ func (b *Bot) dispatch(ctx context.Context, _ *tgBot.Bot, update *models.Update)
 	}
 	slog.Info("telegram update",
 		slog.Int64("chatId", msg.Chat.ID),
-		slog.Int64("userId", userID),
-		slog.String("username", username),
 		slog.String("text", msg.Text))
+
+	b.handlerMu.RLock()
+	handler := b.handler
+	b.handlerMu.RUnlock()
+	if handler == nil {
+		slog.Warn("Reply is not set",
+			slog.Int64("chatId", msg.Chat.ID))
+		return
+	}
+
+	reply := replyHandler(ctx, handler, Input{
+		ChatID:   msg.Chat.ID,
+		UserID:   userID,
+		Username: username,
+		Text:     msg.Text,
+		Raw:      update,
+	})
+	if reply == "" {
+		return
+	}
 
 	if _, err := b.api.SendMessage(ctx, &tgBot.SendMessageParams{
 		ChatID: msg.Chat.ID,
-		Text:   "hi",
+		Text:   reply,
 	}); err != nil {
 		slog.Warn("go-telegram/bot Bot.SendMessage",
 			slog.Int64("chatId", msg.Chat.ID),

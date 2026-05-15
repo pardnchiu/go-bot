@@ -109,11 +109,6 @@ func (b *Bot) handleMultiSelectCallback(ctx context.Context, update *models.Upda
 				slog.String("err", err.Error()))
 		}
 
-		slog.Info("telegram multi-select done",
-			slog.Int64("chatId", promptMsg.Chat.ID),
-			slog.Int("promptMsgId", promptMsg.ID),
-			slog.Int("pickCount", len(picks)))
-
 		b.handlerMu.RLock()
 		handler := b.handler
 		b.handlerMu.RUnlock()

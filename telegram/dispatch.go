@@ -27,12 +27,6 @@ func (b *Bot) dispatch(ctx context.Context, _ *tgBot.Bot, update *models.Update)
 		userID = msg.From.ID
 		username = msg.From.Username
 	}
-	slog.Info("telegram update",
-		slog.Int64("chatId", msg.Chat.ID),
-		slog.String("text", msg.Text),
-		slog.String("caption", msg.Caption),
-		slog.Int("photoCount", len(msg.Photo)),
-		slog.Bool("hasDocument", msg.Document != nil))
 
 	b.handlerMu.RLock()
 	handler := b.handler
@@ -99,11 +93,6 @@ func (b *Bot) dispatchCallback(ctx context.Context, update *models.Update) {
 		slog.Warn("go-telegram/bot Bot.EditMessageReplyMarkup",
 			slog.String("err", err.Error()))
 	}
-
-	slog.Info("telegram callback",
-		slog.Int64("chatId", promptMsg.Chat.ID),
-		slog.String("data", query.Data),
-		slog.Int("promptMsgId", promptMsg.ID))
 
 	b.handlerMu.RLock()
 	handler := b.handler

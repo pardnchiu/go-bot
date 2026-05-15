@@ -66,9 +66,16 @@ func (b *Bot) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("go-telegram/bot Bot.GetMe: %w", err)
 	}
-	if _, err := b.api.DeleteWebhook(ctx, &tgBot.DeleteWebhookParams{DropPendingUpdates: false}); err != nil {
-		slog.Warn("go-telegram/bot Bot.DeleteWebhook",
+	info, err := b.api.GetWebhookInfo(ctx)
+	switch {
+	case err != nil:
+		slog.Warn("go-telegram/bot Bot.GetWebhookInfo",
 			slog.String("err", err.Error()))
+	case info.URL != "":
+		if _, err := b.api.DeleteWebhook(ctx, &tgBot.DeleteWebhookParams{DropPendingUpdates: false}); err != nil {
+			slog.Warn("go-telegram/bot Bot.DeleteWebhook",
+				slog.String("err", err.Error()))
+		}
 	}
 
 	runCtx, cancel := context.WithCancel(ctx)

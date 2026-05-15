@@ -25,6 +25,8 @@ type Bot struct {
 	me        *models.User
 	handlerMu sync.RWMutex
 	handler   ReplyHandler
+	statusMu  sync.Mutex
+	statuses  map[int64]*ChatStatus
 }
 
 func New(token string) (*Bot, error) {
@@ -32,7 +34,7 @@ func New(token string) (*Bot, error) {
 		return nil, fmt.Errorf("token is required")
 	}
 
-	bot := &Bot{}
+	bot := &Bot{statuses: make(map[int64]*ChatStatus)}
 	api, err := tgBot.New(token,
 		tgBot.WithDefaultHandler(bot.dispatch),
 		tgBot.WithErrorsHandler(func(err error) {
@@ -93,6 +95,16 @@ func (b *Bot) Close() error {
 
 	cancel()
 	<-done
+
+	b.statusMu.Lock()
+	for _, e := range b.statuses {
+		if e.timer != nil {
+			e.timer.Stop()
+			e.timer = nil
+		}
+	}
+	b.statuses = make(map[int64]*ChatStatus)
+	b.statusMu.Unlock()
 	return nil
 }
 
@@ -137,22 +149,24 @@ func (b *Bot) dispatch(ctx context.Context, _ *tgBot.Bot, update *models.Update)
 	}
 
 	reply := replyHandler(ctx, handler, Input{
-		ChatID:   msg.Chat.ID,
-		UserID:   userID,
-		Username: username,
-		Text:     msg.Text,
-		Caption:  msg.Caption,
-		Photo:    msg.Photo,
-		Document: msg.Document,
-		Raw:      update,
+		ChatID:    msg.Chat.ID,
+		MessageID: msg.ID,
+		UserID:    userID,
+		Username:  username,
+		Text:      msg.Text,
+		Caption:   msg.Caption,
+		Photo:     msg.Photo,
+		Document:  msg.Document,
+		Raw:       update,
 	})
 	if reply == "" {
 		return
 	}
 
 	if _, err := b.api.SendMessage(ctx, &tgBot.SendMessageParams{
-		ChatID: msg.Chat.ID,
-		Text:   reply,
+		ChatID:          msg.Chat.ID,
+		Text:            reply,
+		ReplyParameters: &models.ReplyParameters{MessageID: msg.ID},
 	}); err != nil {
 		slog.Warn("go-telegram/bot Bot.SendMessage",
 			slog.Int64("chatId", msg.Chat.ID),

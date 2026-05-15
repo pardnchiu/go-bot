@@ -50,7 +50,7 @@ func (b *Bot) Send(ctx context.Context, chatID int64, text string) (*models.Mess
 func (b *Bot) SendVoice(ctx context.Context, chatID int64, text, apiKey string, caption ...string) (*models.Message, error) {
 	ogg, err := tts.Get(ctx, apiKey, text)
 	if err != nil {
-		return nil, fmt.Errorf("tts.Get: %w", err)
+		return nil, fmt.Errorf("github.com/pardnchiu/go-bot/tts Get: %w", err)
 	}
 	params := &tgBot.SendVoiceParams{
 		ChatID: chatID,

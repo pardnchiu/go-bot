@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 
 const (
 	statusMinInterval = time.Second
-	statusPrefix      = "🤔 "
+	statusReaction    = "🤔"
 )
 
 type ChatStatus struct {
@@ -92,10 +93,11 @@ func (b *Bot) FinishStatus(ctx context.Context, chatID int64) error {
 	}
 
 	msgID := status.messageID
+	replyTo := status.replyTo
 	delete(b.statuses, chatID)
 	b.statusMu.Unlock()
 
-	return b.doFinishChat(ctx, chatID, msgID)
+	return b.doFinishChat(ctx, chatID, msgID, replyTo)
 }
 
 func (b *Bot) flushStatus(chatID int64) error {
@@ -120,21 +122,33 @@ func (b *Bot) flushStatus(chatID int64) error {
 	msgID := status.messageID
 	replyTo := status.replyTo
 	ctx := status.ctx
-	decorated := statusPrefix + text
-	skip := msgID != 0 && decorated == status.lastText
+	skip := msgID != 0 && text == status.lastText
 	b.statusMu.Unlock()
 
 	if skip {
-		b.afterFlushStatus(chatID, status, msgID, decorated, nil)
+		b.afterFlushStatus(chatID, status, msgID, text, nil)
 		return nil
 	}
 
 	var newID int
 	var err error
 	if msgID == 0 {
+		if replyTo != 0 {
+			if _, reactErr := b.api.SetMessageReaction(ctx, &tgBot.SetMessageReactionParams{
+				ChatID:    chatID,
+				MessageID: replyTo,
+				Reaction: []models.ReactionType{{
+					Type:              models.ReactionTypeTypeEmoji,
+					ReactionTypeEmoji: &models.ReactionTypeEmoji{Emoji: statusReaction},
+				}},
+			}); reactErr != nil {
+				slog.Warn("go-telegram/bot Bot.SetMessageReaction",
+					slog.String("err", reactErr.Error()))
+			}
+		}
 		params := &tgBot.SendMessageParams{
 			ChatID: chatID,
-			Text:   decorated,
+			Text:   text,
 		}
 		if replyTo != 0 {
 			params.ReplyParameters = &models.ReplyParameters{MessageID: replyTo}
@@ -148,7 +162,7 @@ func (b *Bot) flushStatus(chatID int64) error {
 		_, editErr := b.api.EditMessageText(ctx, &tgBot.EditMessageTextParams{
 			ChatID:    chatID,
 			MessageID: msgID,
-			Text:      decorated,
+			Text:      text,
 		})
 		err = editErr
 		newID = msgID
@@ -156,7 +170,7 @@ func (b *Bot) flushStatus(chatID int64) error {
 			err = nil
 		}
 	}
-	b.afterFlushStatus(chatID, status, newID, decorated, err)
+	b.afterFlushStatus(chatID, status, newID, text, err)
 	return err
 }
 
@@ -177,11 +191,12 @@ func (b *Bot) afterFlushStatus(chatID int64, status *ChatStatus, newID int, newT
 	if status.finishing {
 		finishCtx := status.finishCtx
 		msgID := status.messageID
+		replyTo := status.replyTo
 		done := status.finishDone
 		delete(b.statuses, chatID)
 		b.statusMu.Unlock()
 
-		_ = b.doFinishChat(finishCtx, chatID, msgID)
+		_ = b.doFinishChat(finishCtx, chatID, msgID, replyTo)
 		close(done)
 		return
 	}
@@ -199,7 +214,17 @@ func (b *Bot) afterFlushStatus(chatID int64, status *ChatStatus, newID int, newT
 	b.statusMu.Unlock()
 }
 
-func (b *Bot) doFinishChat(ctx context.Context, chatID int64, msgID int) error {
+func (b *Bot) doFinishChat(ctx context.Context, chatID int64, msgID, replyTo int) error {
+	if replyTo != 0 {
+		if _, reactErr := b.api.SetMessageReaction(ctx, &tgBot.SetMessageReactionParams{
+			ChatID:    chatID,
+			MessageID: replyTo,
+			Reaction:  nil,
+		}); reactErr != nil {
+			slog.Warn("go-telegram/bot Bot.SetMessageReaction",
+				slog.String("err", reactErr.Error()))
+		}
+	}
 	if msgID == 0 {
 		return nil
 	}

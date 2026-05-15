@@ -13,8 +13,7 @@ import (
 type FileType int
 
 const (
-	TypePhoto FileType = iota
-	TypeDocument
+	TypeDocument FileType = iota
 	TypeVideo
 	TypeAudio
 )
@@ -40,12 +39,6 @@ func (b *Bot) SendFile(ctx context.Context, chatID int64, fileType FileType, pat
 	}
 
 	switch fileType {
-	case TypePhoto:
-		return b.api.SendPhoto(ctx, &tgBot.SendPhotoParams{
-			ChatID:  chatID,
-			Photo:   upload,
-			Caption: captionStr,
-		})
 	case TypeDocument:
 		return b.api.SendDocument(ctx, &tgBot.SendDocumentParams{
 			ChatID:   chatID,

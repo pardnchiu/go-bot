@@ -12,15 +12,16 @@ import (
 )
 
 type Input struct {
-	ChatID    int64
-	MessageID int
-	UserID    int64
-	Username  string
-	Text      string
-	Caption   string
-	Photo     []models.PhotoSize
-	Document  *models.Document
-	Raw       *models.Update
+	ChatID       int64
+	MessageID    int
+	UserID       int64
+	Username     string
+	Text         string
+	Caption      string
+	Photo        []models.PhotoSize
+	Document     *models.Document
+	CallbackData string
+	Raw          *models.Update
 }
 
 type ReplyHandler func(ctx context.Context, input Input) string
@@ -40,11 +41,23 @@ func replyHandler(ctx context.Context, handler ReplyHandler, input Input) (out s
 	return handler(ctx, input)
 }
 
-func (b *Bot) Send(ctx context.Context, chatID int64, text string) (*models.Message, error) {
-	return b.api.SendMessage(ctx, &tgBot.SendMessageParams{
+func (b *Bot) Send(ctx context.Context, chatID int64, replyTo int, text string) (*models.Message, error) {
+	params := &tgBot.SendMessageParams{
 		ChatID: chatID,
 		Text:   text,
+	}
+	if replyTo > 0 {
+		params.ReplyParameters = &models.ReplyParameters{MessageID: replyTo}
+	}
+	return b.api.SendMessage(ctx, params)
+}
+
+func (b *Bot) Delete(ctx context.Context, chatID int64, msgID int) error {
+	_, err := b.api.DeleteMessage(ctx, &tgBot.DeleteMessageParams{
+		ChatID:    chatID,
+		MessageID: msgID,
 	})
+	return err
 }
 
 func (b *Bot) SendVoice(ctx context.Context, chatID int64, text, apiKey string, caption ...string) (*models.Message, error) {

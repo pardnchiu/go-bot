@@ -12,16 +12,17 @@ import (
 )
 
 type Input struct {
-	ChatID       int64
-	MessageID    int
-	UserID       int64
-	Username     string
-	Text         string
-	Caption      string
-	Photo        []models.PhotoSize
-	Document     *models.Document
-	CallbackData string
-	Raw          *models.Update
+	ChatID        int64
+	MessageID     int
+	UserID        int64
+	Username      string
+	Text          string
+	Caption       string
+	Photo         []models.PhotoSize
+	Document      *models.Document
+	CallbackData  string
+	CallbackPicks []string
+	Raw           *models.Update
 }
 
 type ReplyHandler func(ctx context.Context, input Input) string

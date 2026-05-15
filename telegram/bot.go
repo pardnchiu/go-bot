@@ -17,16 +17,18 @@ type Status struct {
 }
 
 type Bot struct {
-	api       *tgBot.Bot
-	mu        sync.Mutex
-	cancel    context.CancelFunc
-	done      chan struct{}
-	running   bool
-	me        *models.User
-	handlerMu sync.RWMutex
-	handler   ReplyHandler
-	statusMu  sync.Mutex
-	statuses  map[int64]*ChatStatus
+	api           *tgBot.Bot
+	mu            sync.Mutex
+	cancel        context.CancelFunc
+	done          chan struct{}
+	running       bool
+	me            *models.User
+	handlerMu     sync.RWMutex
+	handler       ReplyHandler
+	statusMu      sync.Mutex
+	statuses      map[int64]*ChatStatus
+	multiSelectMu sync.Mutex
+	multiSelects  map[multiSelectKey]*multiSelectState
 }
 
 func New(token string) (*Bot, error) {
@@ -34,7 +36,10 @@ func New(token string) (*Bot, error) {
 		return nil, fmt.Errorf("token is required")
 	}
 
-	bot := &Bot{statuses: make(map[int64]*ChatStatus)}
+	bot := &Bot{
+		statuses:     make(map[int64]*ChatStatus),
+		multiSelects: make(map[multiSelectKey]*multiSelectState),
+	}
 	api, err := tgBot.New(token,
 		tgBot.WithDefaultHandler(bot.dispatch),
 		tgBot.WithErrorsHandler(func(err error) {
@@ -105,6 +110,10 @@ func (b *Bot) Close() error {
 	}
 	b.statuses = make(map[int64]*ChatStatus)
 	b.statusMu.Unlock()
+
+	b.multiSelectMu.Lock()
+	b.multiSelects = make(map[multiSelectKey]*multiSelectState)
+	b.multiSelectMu.Unlock()
 	return nil
 }
 

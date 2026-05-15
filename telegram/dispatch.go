@@ -83,6 +83,14 @@ func (b *Bot) dispatchCallback(ctx context.Context, update *models.Update) {
 			slog.String("err", err.Error()))
 	}
 
+	b.multiSelectMu.Lock()
+	msState, isMulti := b.multiSelects[multiSelectKey{chatID: promptMsg.Chat.ID, msgID: promptMsg.ID}]
+	b.multiSelectMu.Unlock()
+	if isMulti {
+		b.handleMultiSelectCallback(ctx, update, msState)
+		return
+	}
+
 	if _, err := b.api.EditMessageReplyMarkup(ctx, &tgBot.EditMessageReplyMarkupParams{
 		ChatID:      promptMsg.Chat.ID,
 		MessageID:   promptMsg.ID,

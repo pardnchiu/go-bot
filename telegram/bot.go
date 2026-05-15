@@ -72,13 +72,14 @@ func (b *Bot) Start(ctx context.Context) error {
 	}
 
 	runCtx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
 	b.cancel = cancel
-	b.done = make(chan struct{})
+	b.done = done
 	b.running = true
 	b.me = me
 
 	go func() {
-		defer close(b.done)
+		defer close(done)
 		b.api.Start(runCtx)
 	}()
 	return nil

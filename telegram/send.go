@@ -11,6 +11,13 @@ import (
 	"github.com/pardnchiu/go-bot/tts"
 )
 
+type SendType int
+
+const (
+	TypeMarkdown SendType = iota
+	TypeHTML
+)
+
 type Input struct {
 	ChatID        int64
 	MessageID     int
@@ -42,13 +49,21 @@ func replyHandler(ctx context.Context, handler ReplyHandler, input Input) (out s
 	return handler(ctx, input)
 }
 
-func (b *Bot) Send(ctx context.Context, chatID int64, replyTo int, text string) (*models.Message, error) {
+func (b *Bot) Send(ctx context.Context, chatID int64, replyTo int, text string, sendType ...SendType) (*models.Message, error) {
 	params := &tgBot.SendMessageParams{
 		ChatID: chatID,
 		Text:   text,
 	}
 	if replyTo > 0 {
 		params.ReplyParameters = &models.ReplyParameters{MessageID: replyTo}
+	}
+	if len(sendType) > 0 {
+		switch sendType[0] {
+		case TypeMarkdown:
+			params.ParseMode = models.ParseModeMarkdown
+		case TypeHTML:
+			params.ParseMode = models.ParseModeHTML
+		}
 	}
 	return b.api.SendMessage(ctx, params)
 }

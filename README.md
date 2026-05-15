@@ -28,7 +28,7 @@ Telegram Bot API 封裝。`New(token)` 建立 client（空 token 即 err，**不
 | `Start(ctx)` | 啟 long polling goroutine；重複呼叫回 `already started` |
 | `Close()` | cancel + 等 goroutine + 清 timer / multi-select state；冪等 |
 | `Status()` | 回 `Status{Running, Username, UserID}` |
-| `Send(ctx, chatID, replyTo, text)` | 薄封裝 `SendMessage` |
+| `Send(ctx, chatID, replyTo, text, sendType...)` | 薄封裝 `SendMessage`；`sendType` 選用，`TypeMarkdown`（→ MarkdownV2）／`TypeHTML`，省略為 plain text |
 | `Delete(ctx, chatID, msgID)` | 薄封裝 `DeleteMessage` |
 | `SendFile(ctx, chatID, t, path, caption...)` | `t = TypeDocument / TypeVideo / TypeAudio`；`os.Open` streaming；unknown type 即 err |
 | `SendPhoto(ctx, chatID, paths, caption...)` | 1 張走 `SendPhoto` 單張 API、2–10 張走 `SendMediaGroup` album；超出範圍即 err |

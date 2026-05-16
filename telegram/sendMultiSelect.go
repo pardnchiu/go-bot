@@ -22,7 +22,7 @@ type multiSelectState struct {
 	doneData string
 }
 
-func (b *Bot) SendMultiSelect(ctx context.Context, chatID int64, replyTo int, text string, items []string, sendType ...SendType) (*models.Message, error) {
+func (b *Bot) SendMultiSelect(ctx context.Context, chatID int64, replyTo int, text string, items []string, opts ...MessageOption) (*models.Message, error) {
 	if text == "" {
 		return nil, fmt.Errorf("text is required")
 	}
@@ -41,6 +41,11 @@ func (b *Bot) SendMultiSelect(ctx context.Context, chatID int64, replyTo int, te
 		return nil, fmt.Errorf("items at least one item")
 	}
 
+	mo := messageOptions{}
+	for _, opt := range opts {
+		opt(&mo)
+	}
+
 	state := &multiSelectState{
 		items:    cleanItems,
 		selected: make(map[string]bool, len(cleanItems)),
@@ -50,18 +55,11 @@ func (b *Bot) SendMultiSelect(ctx context.Context, chatID int64, replyTo int, te
 	params := &tgBot.SendMessageParams{
 		ChatID:      chatID,
 		Text:        text,
+		ParseMode:   mo.parseMode,
 		ReplyMarkup: buildMultiSelectMarkup(state),
 	}
 	if replyTo > 0 {
 		params.ReplyParameters = &models.ReplyParameters{MessageID: replyTo}
-	}
-	if len(sendType) > 0 {
-		switch sendType[0] {
-		case TypeMarkdown:
-			params.ParseMode = models.ParseModeMarkdown
-		case TypeHTML:
-			params.ParseMode = models.ParseModeHTML
-		}
 	}
 	msg, err := b.api.SendMessage(ctx, params)
 	if err != nil {

@@ -15,23 +15,49 @@ const (
 	defaultStatusReaction = "🤔"
 )
 
-type ChatStatus struct {
-	messageID  int
-	replyTo    int
-	reaction   string
-	pending    string
-	hasPending bool
-	lastText   string
-	lastFlush  time.Time
-	timer      *time.Timer
-	inflight   bool
-	ctx        context.Context
-	finishing  bool
-	finishCtx  context.Context
-	finishDone chan struct{}
+type StatusOption func(*statusOptions)
+
+type statusOptions struct {
+	emoji     string
+	parseMode models.ParseMode
 }
 
-func (b *Bot) SendStatus(ctx context.Context, chatID int64, replyTo int, text string, emoji ...string) error {
+func WithStatusEmoji(emoji string) StatusOption {
+	return func(o *statusOptions) {
+		o.emoji = emoji
+	}
+}
+
+func WithStatusSendType(t SendType) StatusOption {
+	return func(o *statusOptions) {
+		o.parseMode = parseMode(t)
+	}
+}
+
+type ChatStatus struct {
+	messageID         int
+	replyTo           int
+	reaction          string
+	parseMode         models.ParseMode
+	parseModeCaptured bool
+	pending           string
+	hasPending        bool
+	lastText          string
+	lastFlush         time.Time
+	timer             *time.Timer
+	inflight          bool
+	ctx               context.Context
+	finishing         bool
+	finishCtx         context.Context
+	finishDone        chan struct{}
+}
+
+func (b *Bot) SendStatus(ctx context.Context, chatID int64, replyTo int, text string, opts ...StatusOption) error {
+	so := statusOptions{}
+	for _, opt := range opts {
+		opt(&so)
+	}
+
 	b.statusMu.Lock()
 	status, ok := b.statuses[chatID]
 	if !ok {
@@ -42,11 +68,15 @@ func (b *Bot) SendStatus(ctx context.Context, chatID int64, replyTo int, text st
 		status.replyTo = replyTo
 	}
 	if status.reaction == "" {
-		if len(emoji) > 0 && emoji[0] != "" {
-			status.reaction = emoji[0]
+		if so.emoji != "" {
+			status.reaction = so.emoji
 		} else {
 			status.reaction = defaultStatusReaction
 		}
+	}
+	if !status.parseModeCaptured {
+		status.parseMode = so.parseMode
+		status.parseModeCaptured = true
 	}
 	status.pending = text
 	status.hasPending = true
@@ -130,6 +160,7 @@ func (b *Bot) flushStatus(chatID int64) error {
 	msgID := status.messageID
 	replyTo := status.replyTo
 	reaction := status.reaction
+	parseMode := status.parseMode
 	ctx := status.ctx
 	skip := msgID != 0 && text == status.lastText
 	b.statusMu.Unlock()
@@ -156,8 +187,9 @@ func (b *Bot) flushStatus(chatID int64) error {
 			}
 		}
 		params := &tgBot.SendMessageParams{
-			ChatID: chatID,
-			Text:   text,
+			ChatID:    chatID,
+			Text:      text,
+			ParseMode: parseMode,
 		}
 		if replyTo != 0 {
 			params.ReplyParameters = &models.ReplyParameters{MessageID: replyTo}
@@ -172,6 +204,7 @@ func (b *Bot) flushStatus(chatID int64) error {
 			ChatID:    chatID,
 			MessageID: msgID,
 			Text:      text,
+			ParseMode: parseMode,
 		})
 		err = editErr
 		newID = msgID

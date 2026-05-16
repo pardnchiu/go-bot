@@ -18,6 +18,28 @@ const (
 	TypeHTML
 )
 
+type MessageOption func(*messageOptions)
+
+type messageOptions struct {
+	parseMode models.ParseMode
+}
+
+func WithSendType(t SendType) MessageOption {
+	return func(o *messageOptions) {
+		o.parseMode = parseMode(t)
+	}
+}
+
+func parseMode(t SendType) models.ParseMode {
+	switch t {
+	case TypeMarkdown:
+		return models.ParseModeMarkdown
+	case TypeHTML:
+		return models.ParseModeHTML
+	}
+	return ""
+}
+
 type Input struct {
 	ChatID        int64
 	MessageID     int
@@ -49,21 +71,18 @@ func replyHandler(ctx context.Context, handler ReplyHandler, input Input) (out s
 	return handler(ctx, input)
 }
 
-func (b *Bot) Send(ctx context.Context, chatID int64, replyTo int, text string, sendType ...SendType) (*models.Message, error) {
+func (b *Bot) Send(ctx context.Context, chatID int64, replyTo int, text string, opts ...MessageOption) (*models.Message, error) {
+	mo := messageOptions{}
+	for _, opt := range opts {
+		opt(&mo)
+	}
 	params := &tgBot.SendMessageParams{
-		ChatID: chatID,
-		Text:   text,
+		ChatID:    chatID,
+		Text:      text,
+		ParseMode: mo.parseMode,
 	}
 	if replyTo > 0 {
 		params.ReplyParameters = &models.ReplyParameters{MessageID: replyTo}
-	}
-	if len(sendType) > 0 {
-		switch sendType[0] {
-		case TypeMarkdown:
-			params.ParseMode = models.ParseModeMarkdown
-		case TypeHTML:
-			params.ParseMode = models.ParseModeHTML
-		}
 	}
 	return b.api.SendMessage(ctx, params)
 }

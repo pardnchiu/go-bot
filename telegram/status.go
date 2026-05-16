@@ -11,13 +11,14 @@ import (
 )
 
 const (
-	statusMinInterval = time.Second
-	statusReaction    = "🤔"
+	statusMinInterval     = time.Second
+	defaultStatusReaction = "🤔"
 )
 
 type ChatStatus struct {
 	messageID  int
 	replyTo    int
+	reaction   string
 	pending    string
 	hasPending bool
 	lastText   string
@@ -30,7 +31,7 @@ type ChatStatus struct {
 	finishDone chan struct{}
 }
 
-func (b *Bot) SendStatus(ctx context.Context, chatID int64, replyTo int, text string) error {
+func (b *Bot) SendStatus(ctx context.Context, chatID int64, replyTo int, text string, emoji ...string) error {
 	b.statusMu.Lock()
 	status, ok := b.statuses[chatID]
 	if !ok {
@@ -39,6 +40,13 @@ func (b *Bot) SendStatus(ctx context.Context, chatID int64, replyTo int, text st
 	}
 	if status.messageID == 0 {
 		status.replyTo = replyTo
+	}
+	if status.reaction == "" {
+		if len(emoji) > 0 && emoji[0] != "" {
+			status.reaction = emoji[0]
+		} else {
+			status.reaction = defaultStatusReaction
+		}
 	}
 	status.pending = text
 	status.hasPending = true
@@ -121,6 +129,7 @@ func (b *Bot) flushStatus(chatID int64) error {
 
 	msgID := status.messageID
 	replyTo := status.replyTo
+	reaction := status.reaction
 	ctx := status.ctx
 	skip := msgID != 0 && text == status.lastText
 	b.statusMu.Unlock()
@@ -139,7 +148,7 @@ func (b *Bot) flushStatus(chatID int64) error {
 				MessageID: replyTo,
 				Reaction: []models.ReactionType{{
 					Type:              models.ReactionTypeTypeEmoji,
-					ReactionTypeEmoji: &models.ReactionTypeEmoji{Emoji: statusReaction},
+					ReactionTypeEmoji: &models.ReactionTypeEmoji{Emoji: reaction},
 				}},
 			}); reactErr != nil {
 				slog.Warn("go-telegram/bot Bot.SetMessageReaction",

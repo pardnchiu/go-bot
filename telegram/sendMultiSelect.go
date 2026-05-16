@@ -22,7 +22,7 @@ type multiSelectState struct {
 	doneData string
 }
 
-func (b *Bot) SendMultiSelect(ctx context.Context, chatID int64, replyTo int, text string, items []string) (*models.Message, error) {
+func (b *Bot) SendMultiSelect(ctx context.Context, chatID int64, replyTo int, text string, items []string, sendType ...SendType) (*models.Message, error) {
 	if text == "" {
 		return nil, fmt.Errorf("text is required")
 	}
@@ -54,6 +54,14 @@ func (b *Bot) SendMultiSelect(ctx context.Context, chatID int64, replyTo int, te
 	}
 	if replyTo > 0 {
 		params.ReplyParameters = &models.ReplyParameters{MessageID: replyTo}
+	}
+	if len(sendType) > 0 {
+		switch sendType[0] {
+		case TypeMarkdown:
+			params.ParseMode = models.ParseModeMarkdown
+		case TypeHTML:
+			params.ParseMode = models.ParseModeHTML
+		}
 	}
 	msg, err := b.api.SendMessage(ctx, params)
 	if err != nil {

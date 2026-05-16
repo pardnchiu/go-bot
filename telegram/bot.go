@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"sync"
+	"time"
 
 	tgBot "github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -31,22 +33,39 @@ type Bot struct {
 	multiSelects  map[multiSelectKey]*multiSelectState
 }
 
-func New(token string) (*Bot, error) {
+func New(token string, opts ...Option) (*Bot, error) {
 	if token == "" {
 		return nil, fmt.Errorf("token is required")
+	}
+
+	var o options
+	for _, opt := range opts {
+		opt(&o)
 	}
 
 	bot := &Bot{
 		statuses:     make(map[int64]*ChatStatus),
 		multiSelects: make(map[multiSelectKey]*multiSelectState),
 	}
-	api, err := tgBot.New(token,
+	sdkOpts := []tgBot.Option{
 		tgBot.WithDefaultHandler(bot.dispatch),
 		tgBot.WithErrorsHandler(func(err error) {
 			slog.Warn("Bot.New",
 				slog.String("err", err.Error()))
 		}),
-	)
+	}
+	if o.httpClient != nil || o.pollTimeout != 0 {
+		poll := o.pollTimeout
+		if poll == 0 {
+			poll = time.Minute
+		}
+		client := o.httpClient
+		if client == nil {
+			client = &http.Client{Timeout: poll}
+		}
+		sdkOpts = append(sdkOpts, tgBot.WithHTTPClient(poll, client))
+	}
+	api, err := tgBot.New(token, sdkOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("Bot.New: %w", err)
 	}

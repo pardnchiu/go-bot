@@ -8,7 +8,9 @@
 
 ### telegram
 
-Telegram Bot API 封裝。`New(token)` 建立 client（空 token 即 err，**不**啟動 polling）；`Start(ctx)` 啟 long polling goroutine（`GetMe` 失敗即 fatal、`DeleteWebhook` 失敗僅 warn）；`Close()` 冪等收尾 — cancel parent ctx、等 goroutine、停所有 status timer、重置 multi-select state。
+Telegram Bot API 封裝。`New(token, opts...)` 建立 client（空 token 即 err，**不**啟動 polling）；`Start(ctx)` 啟 long polling goroutine（`GetMe` 失敗即 fatal、`DeleteWebhook` 失敗僅 warn）；`Close()` 冪等收尾 — cancel parent ctx、等 goroutine、停所有 status timer、重置 multi-select state。
+
+底層 SDK 用同一個 `http.Client` 服務 long-poll 與 multipart upload，預設 `client.Timeout=1m` 與 `pollTimeout=1m` 同值。對大檔上傳（≥ 數 MB）會 timeout；同時 long-poll 在 idle 週期遇 network jitter > 1s 也會 race 出 `context deadline exceeded`。caller 可透過 `WithHTTPClient(*http.Client)` 與 `WithPollTimeout(time.Duration)` 覆寫，原則：`client.Timeout > pollTimeout + jitter buffer`，或 `client.Timeout=0` 把 deadline 交給 context。
 
 訊息傳送一律走 streaming 上傳（`os.Open` 或 `bytes.NewReader`），不在 process 內聚積 binary。`Send` / `SendFile` / `SendPhoto` / `SendVoice` / `SendInput` / `SendSelect` / `SendMultiSelect` 全部吃 `replyTo int`：傳 `0` 表 standalone，`> 0` 自動掛 `ReplyParameters{MessageID: replyTo}`。
 
@@ -24,7 +26,7 @@ Telegram Bot API 封裝。`New(token)` 建立 client（空 token 即 err，**不
 
 | API | 行為 |
 |---|---|
-| `New(token)` | 建立 `*Bot`；空 token 即 err；**不**啟動 polling |
+| `New(token, opts ...Option)` | 建立 `*Bot`；空 token 即 err；**不**啟動 polling。Option：`WithHTTPClient(*http.Client)`、`WithPollTimeout(time.Duration)` |
 | `Start(ctx)` | 啟 long polling goroutine；重複呼叫回 `already started` |
 | `Close()` | cancel + 等 goroutine + 清 timer / multi-select state；冪等 |
 | `Status()` | 回 `Status{Running, Username, UserID}` |
@@ -48,11 +50,16 @@ Telegram Bot API 封裝。`New(token)` 建立 client（空 token 即 err，**不
 ```go
 import (
     "context"
+    "net/http"
     "strings"
+    "time"
     "github.com/pardnchiu/go-bot/telegram"
 )
 
-bot, err := telegram.New(token)
+bot, err := telegram.New(token,
+    telegram.WithHTTPClient(&http.Client{Timeout: 5 * time.Minute}),
+    telegram.WithPollTimeout(30 * time.Second),
+)
 if err != nil {
     return err
 }

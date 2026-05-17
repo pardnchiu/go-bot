@@ -1,0 +1,67 @@
+package discord
+
+import (
+	"log/slog"
+
+	"github.com/bwmarrin/discordgo"
+)
+
+func (b *Bot) dispatch(s *discordgo.Session, m *discordgo.MessageCreate) {
+	if m == nil || m.Message == nil {
+		return
+	}
+	if s.State != nil && s.State.User != nil && m.Author != nil && m.Author.ID == s.State.User.ID {
+		return
+	}
+
+	b.mu.Lock()
+	running := b.running
+	ctx := b.ctx
+	b.mu.Unlock()
+	if !running || ctx == nil {
+		return
+	}
+
+	var userID, username string
+	if m.Author != nil {
+		userID = m.Author.ID
+		username = m.Author.Username
+	}
+
+	slog.Info("discord message",
+		slog.String("channelId", m.ChannelID),
+		slog.String("guildId", m.GuildID),
+		slog.String("userId", userID),
+		slog.String("username", username),
+		slog.String("text", m.Content))
+
+	b.handlerMu.RLock()
+	handler := b.handler
+	b.handlerMu.RUnlock()
+	if handler == nil {
+		return
+	}
+
+	reply := replyHandler(ctx, handler, Input{
+		ChannelID: m.ChannelID,
+		GuildID:   m.GuildID,
+		MessageID: m.ID,
+		UserID:    userID,
+		Username:  username,
+		Text:      m.Content,
+		Raw:       m,
+	})
+	if reply == "" {
+		return
+	}
+
+	if _, err := b.api.ChannelMessageSendReply(m.ChannelID, reply, &discordgo.MessageReference{
+		MessageID: m.ID,
+		ChannelID: m.ChannelID,
+		GuildID:   m.GuildID,
+	}, discordgo.WithContext(ctx)); err != nil {
+		slog.Warn("bwmarrin/discordgo Session.ChannelMessageSendReply",
+			slog.String("channelId", m.ChannelID),
+			slog.String("err", err.Error()))
+	}
+}

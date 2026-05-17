@@ -23,6 +23,8 @@ type Bot struct {
 	me        *discordgo.User
 	handlerMu sync.RWMutex
 	handler   ReplyHandler
+	statusMu  sync.Mutex
+	statuses  map[string]*ChannelStatus
 }
 
 func New(token string) (*Bot, error) {
@@ -36,7 +38,10 @@ func New(token string) (*Bot, error) {
 	}
 	api.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentDirectMessages | discordgo.IntentMessageContent
 
-	bot := &Bot{api: api}
+	bot := &Bot{
+		api:      api,
+		statuses: make(map[string]*ChannelStatus),
+	}
 	api.AddHandler(bot.dispatch)
 	return bot, nil
 }
@@ -81,6 +86,16 @@ func (b *Bot) Close() error {
 	if err := b.api.Close(); err != nil {
 		return fmt.Errorf("bwmarrin/discordgo Session.Close: %w", err)
 	}
+
+	b.statusMu.Lock()
+	for _, s := range b.statuses {
+		if s.timer != nil {
+			s.timer.Stop()
+			s.timer = nil
+		}
+	}
+	b.statuses = make(map[string]*ChannelStatus)
+	b.statusMu.Unlock()
 	return nil
 }
 

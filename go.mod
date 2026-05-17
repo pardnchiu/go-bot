@@ -6,7 +6,7 @@ require github.com/go-telegram/bot v1.20.0
 
 require (
 	github.com/bwmarrin/discordgo v0.29.0
-	github.com/pardnchiu/go-pkg v0.12.2
+	github.com/pardnchiu/go-pkg v0.12.3
 )
 
 require (

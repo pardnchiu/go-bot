@@ -8,13 +8,14 @@ import (
 )
 
 type Input struct {
-	ChannelID string
-	GuildID   string
-	MessageID string
-	UserID    string
-	Username  string
-	Text      string
-	Raw       *discordgo.MessageCreate
+	ChannelID   string
+	GuildID     string
+	MessageID   string
+	UserID      string
+	Username    string
+	Text        string
+	Attachments []*discordgo.MessageAttachment
+	Raw         *discordgo.MessageCreate
 }
 
 type ReplyHandler func(ctx context.Context, input Input) string

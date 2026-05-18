@@ -43,13 +43,14 @@ func (b *Bot) dispatch(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	reply := replyHandler(ctx, handler, Input{
-		ChannelID: m.ChannelID,
-		GuildID:   m.GuildID,
-		MessageID: m.ID,
-		UserID:    userID,
-		Username:  username,
-		Text:      m.Content,
-		Raw:       m,
+		ChannelID:   m.ChannelID,
+		GuildID:     m.GuildID,
+		MessageID:   m.ID,
+		UserID:      userID,
+		Username:    username,
+		Text:        m.Content,
+		Attachments: m.Attachments,
+		Raw:         m,
 	})
 	if reply == "" {
 		return

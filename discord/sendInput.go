@@ -79,7 +79,13 @@ func (b *Bot) interactionDispatch(s *discordgo.Session, i *discordgo.Interaction
 	}
 	switch i.Type {
 	case discordgo.InteractionMessageComponent:
-		b.handleInputButton(i)
+		data := i.MessageComponentData()
+		switch {
+		case strings.HasPrefix(data.CustomID, inputButtonPrefix):
+			b.handleInputButton(i)
+		case strings.HasPrefix(data.CustomID, selectMenuPrefix):
+			b.handleSelectMenu(i)
+		}
 	case discordgo.InteractionModalSubmit:
 		b.handleInputModalSubmit(i)
 	}

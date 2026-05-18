@@ -48,3 +48,16 @@ func (b *Bot) Send(ctx context.Context, channelID, replyTo, text string) (*disco
 	}
 	return b.api.ChannelMessageSendComplex(channelID, data, discordgo.WithContext(ctx))
 }
+
+func (b *Bot) Delete(ctx context.Context, channelID, messageID string) error {
+	if channelID == "" {
+		return fmt.Errorf("channelID is required")
+	}
+	if messageID == "" {
+		return fmt.Errorf("messageID is required")
+	}
+	if err := b.api.ChannelMessageDelete(channelID, messageID, discordgo.WithContext(ctx)); err != nil {
+		return fmt.Errorf("bwmarrin/discordgo Session.ChannelMessageDelete: %w", err)
+	}
+	return nil
+}

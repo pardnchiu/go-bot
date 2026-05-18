@@ -25,6 +25,8 @@ type Bot struct {
 	handler   ReplyHandler
 	statusMu  sync.Mutex
 	statuses  map[string]*ChannelStatus
+	inputsMu  sync.Mutex
+	inputs    map[string]*inputState
 }
 
 func New(token string) (*Bot, error) {
@@ -41,8 +43,10 @@ func New(token string) (*Bot, error) {
 	bot := &Bot{
 		api:      api,
 		statuses: make(map[string]*ChannelStatus),
+		inputs:   make(map[string]*inputState),
 	}
 	api.AddHandler(bot.dispatch)
+	api.AddHandler(bot.interactionDispatch)
 	return bot, nil
 }
 
@@ -96,6 +100,10 @@ func (b *Bot) Close() error {
 	}
 	b.statuses = make(map[string]*ChannelStatus)
 	b.statusMu.Unlock()
+
+	b.inputsMu.Lock()
+	b.inputs = make(map[string]*inputState)
+	b.inputsMu.Unlock()
 	return nil
 }
 

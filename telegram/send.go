@@ -42,6 +42,7 @@ func parseMode(t SendType) models.ParseMode {
 
 type Input struct {
 	ChatID        int64
+	ChatName      string
 	MessageID     int
 	UserID        int64
 	Username      string

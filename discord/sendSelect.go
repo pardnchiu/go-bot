@@ -149,11 +149,12 @@ func (b *Bot) handleSelectMenu(i *discordgo.InteractionCreate) {
 	}
 
 	in := Input{
-		ChannelID: state.channelID,
-		GuildID:   i.GuildID,
-		MessageID: state.promptMessageID,
-		UserID:    userID,
-		Username:  username,
+		ChannelID:   state.channelID,
+		ChannelName: b.channelName(state.channelID),
+		GuildID:     i.GuildID,
+		MessageID:   state.promptMessageID,
+		UserID:      userID,
+		Username:    username,
 	}
 	if state.multi {
 		in.CallbackPicks = data.Values

@@ -6,6 +6,16 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+func (b *Bot) channelName(channelID string) string {
+	if channelID == "" || b.api == nil {
+		return ""
+	}
+	if ch, err := b.api.State.Channel(channelID); err == nil && ch != nil {
+		return ch.Name
+	}
+	return ""
+}
+
 func (b *Bot) dispatch(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m == nil || m.Message == nil {
 		return
@@ -44,6 +54,7 @@ func (b *Bot) dispatch(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	reply := replyHandler(ctx, handler, Input{
 		ChannelID:   m.ChannelID,
+		ChannelName: b.channelName(m.ChannelID),
 		GuildID:     m.GuildID,
 		MessageID:   m.ID,
 		UserID:      userID,

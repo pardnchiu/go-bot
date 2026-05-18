@@ -222,12 +222,13 @@ func (b *Bot) handleInputModalSubmit(i *discordgo.InteractionCreate) {
 	}
 
 	reply := replyHandler(ctx, handler, Input{
-		ChannelID: state.channelID,
-		GuildID:   i.GuildID,
-		MessageID: state.promptMessageID,
-		UserID:    userID,
-		Username:  username,
-		Text:      text,
+		ChannelID:   state.channelID,
+		ChannelName: b.channelName(state.channelID),
+		GuildID:     i.GuildID,
+		MessageID:   state.promptMessageID,
+		UserID:      userID,
+		Username:    username,
+		Text:        text,
 	})
 	if reply == "" {
 		return

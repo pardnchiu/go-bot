@@ -27,7 +27,7 @@
 `MessageOption`：`WithSendType(SendType)`。
 `StatusOption`：`WithStatusEmoji(string)`、`WithStatusSendType(SendType)`。
 
-`Input` 欄位：`ChatID / MessageID / UserID / Username / Text / Caption / Photo / Document / CallbackData / CallbackPicks / Raw`。`CallbackData` 為 single-select 結果、`CallbackPicks` 為 multi-select 完成結果，兩者互斥。
+`Input` 欄位：`ChatID / ChatName / MessageID / UserID / Username / Text / Caption / Photo / Document / CallbackData / CallbackPicks / Raw`。`ChatName` 自動填：`Chat.Title`（group/channel）→ `Chat.Username`（public username）→ `FirstName + LastName`（private 1-1）→ `""`。`CallbackData` 為 single-select 結果、`CallbackPicks` 為 multi-select 完成結果，兩者互斥。
 
 ```go
 import (
@@ -86,7 +86,7 @@ path, _ := bot.SaveFile(ctx, in.Photo[len(in.Photo)-1].FileID, "./tmp")
 
 `StatusOption`：`WithStatusEmoji(string)`。Discord 不支援 ParseMode 切換（auto-markdown），無 SendType option。
 
-`Input` 欄位：`ChannelID / GuildID / MessageID / UserID / Username / Text / Attachments / CallbackPicks / Raw`（全 string）。需開 **Message Content Intent**（Developer Portal → Bot）否則 `Text` 為空（除 mention / DM / 自己訊息外）。`Attachments` 為 user 上傳的全部附件、`CallbackPicks` 只在 `SendMultiSelect` 完成收尾時 non-empty；`Text` 與 `CallbackPicks` 互斥（single-tap / modal answer 走 `Text`，multi-select 走 `CallbackPicks`）。
+`Input` 欄位：`ChannelID / ChannelName / GuildID / MessageID / UserID / Username / Text / Attachments / CallbackPicks / Raw`（全 string）。`ChannelName` 從 discordgo `Session.State` cache 取（gateway 連線時 `GUILD_CREATE` 已自動塞滿，零 round-trip）；DM 或 cache miss 為空字串。需開 **Message Content Intent**（Developer Portal → Bot）否則 `Text` 為空（除 mention / DM / 自己訊息外）。`Attachments` 為 user 上傳的全部附件、`CallbackPicks` 只在 `SendMultiSelect` 完成收尾時 non-empty；`Text` 與 `CallbackPicks` 互斥（single-tap / modal answer 走 `Text`，multi-select 走 `CallbackPicks`）。
 
 ```go
 import (

@@ -126,6 +126,7 @@ func (b *Bot) handleMultiSelectCallback(ctx context.Context, update *models.Upda
 
 		reply := replyHandler(ctx, handler, Input{
 			ChatID:        promptMsg.Chat.ID,
+			ChatName:      chatName(&promptMsg.Chat),
 			MessageID:     promptMsg.ID,
 			UserID:        query.From.ID,
 			Username:      query.From.Username,

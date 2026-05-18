@@ -3,10 +3,24 @@ package telegram
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	tgBot "github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 )
+
+func chatName(c *models.Chat) string {
+	if c == nil {
+		return ""
+	}
+	if c.Title != "" {
+		return c.Title
+	}
+	if c.Username != "" {
+		return c.Username
+	}
+	return strings.TrimSpace(c.FirstName + " " + c.LastName)
+}
 
 func (b *Bot) dispatch(ctx context.Context, _ *tgBot.Bot, update *models.Update) {
 	if update == nil {
@@ -39,6 +53,7 @@ func (b *Bot) dispatch(ctx context.Context, _ *tgBot.Bot, update *models.Update)
 
 	reply := replyHandler(ctx, handler, Input{
 		ChatID:    msg.Chat.ID,
+		ChatName:  chatName(&msg.Chat),
 		MessageID: msg.ID,
 		UserID:    userID,
 		Username:  username,
@@ -105,6 +120,7 @@ func (b *Bot) dispatchCallback(ctx context.Context, update *models.Update) {
 
 	reply := replyHandler(ctx, handler, Input{
 		ChatID:       promptMsg.Chat.ID,
+		ChatName:     chatName(&promptMsg.Chat),
 		MessageID:    promptMsg.ID,
 		UserID:       query.From.ID,
 		Username:     query.From.Username,

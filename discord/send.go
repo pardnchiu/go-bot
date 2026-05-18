@@ -9,6 +9,7 @@ import (
 
 type Input struct {
 	ChannelID     string
+	ChannelName   string
 	GuildID       string
 	MessageID     string
 	UserID        string

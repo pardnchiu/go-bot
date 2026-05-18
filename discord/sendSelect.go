@@ -116,12 +116,9 @@ func (b *Bot) handleSelectMenu(i *discordgo.InteractionCreate) {
 	}
 
 	if err := b.api.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseUpdateMessage,
-		Data: &discordgo.InteractionResponseData{
-			Components: []discordgo.MessageComponent{},
-		},
+		Type: discordgo.InteractionResponseDeferredMessageUpdate,
 	}); err != nil {
-		slog.Warn("bwmarrin/discordgo Session.InteractionRespond (select clear menu)",
+		slog.Warn("bwmarrin/discordgo Session.InteractionRespond (select ack)",
 			slog.String("err", err.Error()))
 	}
 

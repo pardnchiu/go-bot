@@ -43,7 +43,7 @@ func (b *Bot) SendInput(ctx context.Context, channelID, replyTo, prompt string) 
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
 					discordgo.Button{
-						Label:    "回答",
+						Label:    "Input",
 						Style:    discordgo.PrimaryButton,
 						CustomID: inputButtonPrefix + uuid,
 					},
@@ -105,7 +105,7 @@ func (b *Bot) handleInputButton(i *discordgo.InteractionCreate) {
 		_ = b.api.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: "已過期，請重新觸發",
+				Content: "Expired",
 				Flags:   discordgo.MessageFlagsEphemeral,
 			},
 		})
@@ -127,7 +127,7 @@ func (b *Bot) handleInputButton(i *discordgo.InteractionCreate) {
 					Components: []discordgo.MessageComponent{
 						discordgo.TextInput{
 							CustomID: inputTextID,
-							Label:    "回答",
+							Label:    "Input",
 							Style:    discordgo.TextInputShort,
 							Required: true,
 						},
@@ -159,7 +159,7 @@ func (b *Bot) handleInputModalSubmit(i *discordgo.InteractionCreate) {
 		_ = b.api.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: "已過期，請重新觸發",
+				Content: "Expired",
 				Flags:   discordgo.MessageFlagsEphemeral,
 			},
 		})

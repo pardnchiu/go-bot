@@ -19,6 +19,7 @@ type selectState struct {
 	channelID       string
 	replyTo         string
 	promptMessageID string
+	multi           bool
 }
 
 func (b *Bot) SendSelect(ctx context.Context, channelID, replyTo, text string, items []string) (*discordgo.Message, error) {
@@ -60,7 +61,7 @@ func (b *Bot) SendSelect(ctx context.Context, channelID, replyTo, text string, i
 					discordgo.SelectMenu{
 						MenuType:    discordgo.StringSelectMenu,
 						CustomID:    selectMenuPrefix + uuid,
-						Placeholder: "選擇",
+						Placeholder: "Select (single-select)",
 						MinValues:   &minOne,
 						MaxValues:   1,
 						Options:     options,
@@ -107,16 +108,11 @@ func (b *Bot) handleSelectMenu(i *discordgo.InteractionCreate) {
 		_ = b.api.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: "已過期，請重新觸發",
+				Content: "Expired",
 				Flags:   discordgo.MessageFlagsEphemeral,
 			},
 		})
 		return
-	}
-
-	var picked string
-	if len(data.Values) > 0 {
-		picked = data.Values[0]
 	}
 
 	if err := b.api.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -152,14 +148,19 @@ func (b *Bot) handleSelectMenu(i *discordgo.InteractionCreate) {
 		username = i.User.Username
 	}
 
-	reply := replyHandler(ctx, handler, Input{
+	in := Input{
 		ChannelID: state.channelID,
 		GuildID:   i.GuildID,
 		MessageID: state.promptMessageID,
 		UserID:    userID,
 		Username:  username,
-		Text:      picked,
-	})
+	}
+	if state.multi {
+		in.CallbackPicks = data.Values
+	} else if len(data.Values) > 0 {
+		in.Text = data.Values[0]
+	}
+	reply := replyHandler(ctx, handler, in)
 	if reply == "" {
 		return
 	}

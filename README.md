@@ -74,12 +74,19 @@ path, _ := bot.SaveFile(ctx, in.Photo[len(in.Photo)-1].FileID, "./tmp")
 | `Status()` | 回 `Status{Running, Username, UserID string}` |
 | `Reply(handler)` | 註冊 sync `ReplyHandler`；過濾 bot 自己訊息 |
 | `Send(ctx, channelID, replyTo, text)` | `ChannelMessageSendComplex`；`replyTo != ""` 掛 `MessageReference` |
+| `Delete(ctx, channelID, messageID)` | 薄封裝 `ChannelMessageDelete`；典型流程：用 SendInput / SendSelect 拿到 `prompt.ID`，互動完成後 caller 自行清掉 |
+| `SendFiles(ctx, channelID, replyTo, paths, caption...)` | 1-10 個 attachment 一次上傳（Discord 單一 API，無 telegram single/album 分流）；`os.Open` streaming；server 從副檔名推 MIME，無 FileType enum |
+| `SendVoice(ctx, channelID, replyTo, text, apiKey, caption...)` | 內部 `tts.Get` 拿 OGG/OPUS → 上傳為 `audio/ogg` attachment（**非**波形 voice message bubble；discordgo v0.29.0 沒暴露 `duration_secs/waveform` 設值欄位） |
+| `SendInput(ctx, channelID, replyTo, prompt)` | 送 prompt 訊息掛 Primary Button；user 點 button → 開 Modal（TextInput Required, Short, Title 取 prompt 前 45 char）→ user 填字送出觸發 ReplyHandler 帶 `Input.Text` |
+| `SendSelect(ctx, channelID, replyTo, text, items)` | StringSelectMenu single-pick（MinValues=1, MaxValues=1）；1-25 items；user 點選觸發 ReplyHandler 帶 `Input.Text` = 選項；library 自動清空 dropdown components |
+| `SendMultiSelect(ctx, channelID, replyTo, text, items)` | StringSelectMenu multi-pick（MinValues=0, MaxValues=len）；Discord 原生多選，**無需** telegram 那套 ✅/⬜ + Done button 中介；submit 觸發 ReplyHandler 帶 `Input.CallbackPicks` 為勾選列表 |
 | `SendStatus(ctx, channelID, replyTo, text, opts ...StatusOption)` | per-channel 單一「思考中」訊息；首次 `MessageReactionAdd`（預設 🤔，`WithStatusEmoji` 覆寫）；後續 `ChannelMessageEdit`；debounce 1s |
 | `FinishStatus(ctx, channelID)` | `MessageReactionRemove("@me")` + `ChannelMessageDelete` |
+| `Save(ctx, att *discordgo.MessageAttachment, dir)` | 把 `input.Attachments` 收到的附件下載到 `dir`；filename = UUID + 原副檔名；25 MiB hard cap（對齊 Discord 免費 server 上限，Nitro / boost 大檔會被 reject）；atomic write via `go-pkg/filesystem`。回傳完整 path |
 
 `StatusOption`：`WithStatusEmoji(string)`。Discord 不支援 ParseMode 切換（auto-markdown），無 SendType option。
 
-`Input` 欄位：`ChannelID / GuildID / MessageID / UserID / Username / Text / Raw`（全 string）。需開 **Message Content Intent**（Developer Portal → Bot）否則 `Text` 為空（除 mention / DM / 自己訊息外）。
+`Input` 欄位：`ChannelID / GuildID / MessageID / UserID / Username / Text / Attachments / CallbackPicks / Raw`（全 string）。需開 **Message Content Intent**（Developer Portal → Bot）否則 `Text` 為空（除 mention / DM / 自己訊息外）。`Attachments` 為 user 上傳的全部附件、`CallbackPicks` 只在 `SendMultiSelect` 完成收尾時 non-empty；`Text` 與 `CallbackPicks` 互斥（single-tap / modal answer 走 `Text`，multi-select 走 `CallbackPicks`）。
 
 ```go
 import (
@@ -94,6 +101,10 @@ if err != nil {
 defer bot.Close()
 
 bot.Reply(func(ctx context.Context, in discord.Input) string {
+    for _, att := range in.Attachments {
+        path, _ := bot.Save(ctx, att, "./tmp")
+        _ = path
+    }
     return "echo: " + in.Text
 })
 
@@ -102,8 +113,14 @@ if err := bot.Start(ctx); err != nil {
 }
 
 bot.Send(ctx, channelID, "", "hello")
+bot.SendFiles(ctx, channelID, "", []string{"./a.png", "./b.png"}, "two images")
+bot.SendVoice(ctx, channelID, "", "今天天氣不錯", geminiAPIKey)
+bot.SendInput(ctx, channelID, triggerMsgID, "你叫什麼名字？")
+bot.SendSelect(ctx, channelID, triggerMsgID, "選個顏色", []string{"紅", "綠", "藍"})
+bot.SendMultiSelect(ctx, channelID, triggerMsgID, "選幾個興趣", []string{"閱讀", "電影", "音樂"})
 bot.SendStatus(ctx, channelID, userMsgID, "思考中...")
 bot.FinishStatus(ctx, channelID)
+bot.Delete(ctx, channelID, promptMsgID)
 ```
 
 ## tts

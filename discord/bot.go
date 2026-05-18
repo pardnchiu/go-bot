@@ -40,7 +40,7 @@ func New(token string) (*Bot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bwmarrin/discordgo New: %w", err)
 	}
-	api.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentDirectMessages | discordgo.IntentMessageContent
+	api.Identify.Intents = discordgo.IntentGuilds | discordgo.IntentsGuildMessages | discordgo.IntentDirectMessages | discordgo.IntentMessageContent
 
 	bot := &Bot{
 		api:      api,

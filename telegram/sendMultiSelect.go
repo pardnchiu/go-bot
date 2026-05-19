@@ -4,12 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
+	"time"
 
 	tgBot "github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 )
 
-const multiSelectDoneData = "__bot_multiselect_done__"
+const (
+	multiSelectDoneData    = "__bot_multiselect_done__"
+	multiSelectMinInterval = time.Second
+	multiSelectStaleTTL    = 5 * time.Minute
+)
 
 type multiSelectKey struct {
 	chatID int64
@@ -20,6 +26,16 @@ type multiSelectState struct {
 	items    []string
 	selected map[string]bool
 	doneData string
+	chatID   int64
+	msgID    int
+
+	mu        sync.Mutex
+	done      bool
+	pending   bool
+	inflight  bool
+	timer     *time.Timer
+	lastFlush time.Time
+	ctx       context.Context
 }
 
 func (b *Bot) SendMultiSelect(ctx context.Context, chatID int64, replyTo int, text string, items []string, opts ...MessageOption) (*models.Message, error) {
@@ -50,6 +66,7 @@ func (b *Bot) SendMultiSelect(ctx context.Context, chatID int64, replyTo int, te
 		items:    cleanItems,
 		selected: make(map[string]bool, len(cleanItems)),
 		doneData: multiSelectDoneData,
+		chatID:   chatID,
 	}
 
 	params := &tgBot.SendMessageParams{
@@ -65,6 +82,8 @@ func (b *Bot) SendMultiSelect(ctx context.Context, chatID int64, replyTo int, te
 	if err != nil {
 		return nil, err
 	}
+
+	state.msgID = msg.ID
 
 	b.multiSelectMu.Lock()
 	b.multiSelects[multiSelectKey{chatID: chatID, msgID: msg.ID}] = state
@@ -94,17 +113,34 @@ func buildMultiSelectMarkup(state *multiSelectState) models.InlineKeyboardMarkup
 func (b *Bot) handleMultiSelectCallback(ctx context.Context, update *models.Update, state *multiSelectState) {
 	query := update.CallbackQuery
 	promptMsg := query.Message.Message
+	key := multiSelectKey{chatID: promptMsg.Chat.ID, msgID: promptMsg.ID}
+
+	state.mu.Lock()
+	if state.done {
+		state.mu.Unlock()
+		return
+	}
 
 	if query.Data == state.doneData {
-		b.multiSelectMu.Lock()
+		state.done = true
+		if state.timer != nil {
+			state.timer.Stop()
+			state.timer = nil
+		}
+		state.pending = false
 		picks := make([]string, 0, len(state.items))
 		for _, item := range state.items {
 			if state.selected[item] {
 				picks = append(picks, item)
 			}
 		}
-		delete(b.multiSelects, multiSelectKey{chatID: promptMsg.Chat.ID, msgID: promptMsg.ID})
-		b.multiSelectMu.Unlock()
+		state.mu.Unlock()
+
+		time.AfterFunc(multiSelectStaleTTL, func() {
+			b.multiSelectMu.Lock()
+			delete(b.multiSelects, key)
+			b.multiSelectMu.Unlock()
+		})
 
 		if _, err := b.api.EditMessageReplyMarkup(ctx, &tgBot.EditMessageReplyMarkupParams{
 			ChatID:      promptMsg.Chat.ID,
@@ -148,17 +184,77 @@ func (b *Bot) handleMultiSelectCallback(ctx context.Context, update *models.Upda
 		return
 	}
 
-	b.multiSelectMu.Lock()
 	state.selected[query.Data] = !state.selected[query.Data]
-	newMarkup := buildMultiSelectMarkup(state)
-	b.multiSelectMu.Unlock()
+	state.pending = true
+	state.ctx = ctx
+
+	if state.inflight {
+		state.mu.Unlock()
+		return
+	}
+
+	elapsed := time.Since(state.lastFlush)
+	if elapsed >= multiSelectMinInterval {
+		state.mu.Unlock()
+		b.flushMultiSelectEdit(state)
+		return
+	}
+	if state.timer == nil {
+		s := state
+		state.timer = time.AfterFunc(multiSelectMinInterval-elapsed, func() {
+			b.flushMultiSelectEdit(s)
+		})
+	}
+	state.mu.Unlock()
+}
+
+func (b *Bot) flushMultiSelectEdit(state *multiSelectState) {
+	state.mu.Lock()
+	if state.done {
+		state.timer = nil
+		state.mu.Unlock()
+		return
+	}
+	if state.inflight || !state.pending {
+		state.timer = nil
+		state.mu.Unlock()
+		return
+	}
+	state.pending = false
+	state.timer = nil
+	state.inflight = true
+
+	markup := buildMultiSelectMarkup(state)
+	chatID := state.chatID
+	msgID := state.msgID
+	ctx := state.ctx
+	state.mu.Unlock()
 
 	if _, err := b.api.EditMessageReplyMarkup(ctx, &tgBot.EditMessageReplyMarkupParams{
-		ChatID:      promptMsg.Chat.ID,
-		MessageID:   promptMsg.ID,
-		ReplyMarkup: newMarkup,
+		ChatID:      chatID,
+		MessageID:   msgID,
+		ReplyMarkup: markup,
 	}); err != nil {
 		slog.Warn("go-telegram/bot Bot.EditMessageReplyMarkup",
 			slog.String("err", err.Error()))
 	}
+
+	state.mu.Lock()
+	state.inflight = false
+	state.lastFlush = time.Now()
+	if state.done {
+		state.mu.Unlock()
+		return
+	}
+	if state.pending && state.timer == nil {
+		delay := multiSelectMinInterval - time.Since(state.lastFlush)
+		if delay <= 0 {
+			delay = time.Millisecond
+		}
+		s := state
+		state.timer = time.AfterFunc(delay, func() {
+			b.flushMultiSelectEdit(s)
+		})
+	}
+	state.mu.Unlock()
 }

@@ -116,10 +116,11 @@ func (b *Bot) FinishStatus(ctx context.Context, chatID int64) error {
 	}
 
 	if status.inflight {
-		status.finishing = true
-		status.finishCtx = ctx
-		status.finishDone = make(chan struct{})
-
+		if status.finishDone == nil {
+			status.finishing = true
+			status.finishCtx = ctx
+			status.finishDone = make(chan struct{})
+		}
 		done := status.finishDone
 		b.statusMu.Unlock()
 		select {

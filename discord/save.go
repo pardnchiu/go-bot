@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/bwmarrin/discordgo"
-	go_pkg_filesystem "github.com/pardnchiu/go-pkg/filesystem"
 	go_pkg_utils "github.com/pardnchiu/go-pkg/utils"
 )
 
@@ -42,21 +42,44 @@ func (b *Bot) Save(ctx context.Context, att *discordgo.MessageAttachment, dir st
 		return "", fmt.Errorf("http %d: %s", resp.StatusCode, raw)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxFileBytes+1))
-	if err != nil {
-		return "", fmt.Errorf("io.ReadAll: %w", err)
-	}
-	if len(body) > maxFileBytes {
-		return "", fmt.Errorf("file too large: exceeds %d bytes (Size header was missing or wrong)", maxFileBytes)
-	}
-
 	name := go_pkg_utils.UUID()
 	if name == "" {
 		return "", fmt.Errorf("github.com/pardnchiu/go-pkg/utils UUID returned empty (crypto/rand failure)")
 	}
-	path := filepath.Join(dir, name+filepath.Ext(att.Filename))
-	if err := go_pkg_filesystem.WriteFile(path, string(body), 0644); err != nil {
-		return "", fmt.Errorf("github.com/pardnchiu/go-pkg/filesystem WriteFile: %w", err)
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("os.MkdirAll: %w", err)
 	}
-	return path, nil
+
+	finalPath := filepath.Join(dir, name+filepath.Ext(att.Filename))
+
+	tmp, err := os.CreateTemp(dir, name+".*.tmp")
+	if err != nil {
+		return "", fmt.Errorf("os.CreateTemp: %w", err)
+	}
+	tmpPath := tmp.Name()
+	cleanup := func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+	}
+
+	written, err := io.Copy(tmp, io.LimitReader(resp.Body, maxFileBytes+1))
+	if err != nil {
+		cleanup()
+		return "", fmt.Errorf("io.Copy: %w", err)
+	}
+	if written > maxFileBytes {
+		cleanup()
+		return "", fmt.Errorf("file too large: exceeds %d bytes (Size header was missing or wrong)", maxFileBytes)
+	}
+
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return "", fmt.Errorf("tmp.Close: %w", err)
+	}
+	if err := os.Rename(tmpPath, finalPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return "", fmt.Errorf("os.Rename: %w", err)
+	}
+	return finalPath, nil
 }

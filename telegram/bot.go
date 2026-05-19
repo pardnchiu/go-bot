@@ -139,6 +139,15 @@ func (b *Bot) Close() error {
 	b.statusMu.Unlock()
 
 	b.multiSelectMu.Lock()
+	for _, s := range b.multiSelects {
+		s.mu.Lock()
+		s.done = true
+		if s.timer != nil {
+			s.timer.Stop()
+			s.timer = nil
+		}
+		s.mu.Unlock()
+	}
 	b.multiSelects = make(map[multiSelectKey]*multiSelectState)
 	b.multiSelectMu.Unlock()
 	return nil

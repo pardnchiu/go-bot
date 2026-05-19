@@ -38,13 +38,6 @@ func (b *Bot) dispatch(s *discordgo.Session, m *discordgo.MessageCreate) {
 		username = m.Author.Username
 	}
 
-	slog.Info("discord message",
-		slog.String("channelId", m.ChannelID),
-		slog.String("guildId", m.GuildID),
-		slog.String("userId", userID),
-		slog.String("username", username),
-		slog.String("text", m.Content))
-
 	b.handlerMu.RLock()
 	handler := b.handler
 	b.handlerMu.RUnlock()

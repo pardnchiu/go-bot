@@ -105,13 +105,16 @@ func (b *Bot) handleSelectMenu(i *discordgo.InteractionCreate) {
 	}
 	b.selectsMu.Unlock()
 	if !ok {
-		_ = b.api.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		if err := b.api.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: "Expired",
 				Flags:   discordgo.MessageFlagsEphemeral,
 			},
-		})
+		}); err != nil {
+			slog.Warn("bwmarrin/discordgo Session.InteractionRespond (select expired)",
+				slog.String("err", err.Error()))
+		}
 		return
 	}
 
@@ -133,6 +136,8 @@ func (b *Bot) handleSelectMenu(i *discordgo.InteractionCreate) {
 	handler := b.handler
 	b.handlerMu.RUnlock()
 	if handler == nil {
+		slog.Warn("Reply is not set",
+			slog.String("channelId", state.channelID))
 		return
 	}
 

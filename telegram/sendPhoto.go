@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -54,7 +55,11 @@ func (b *Bot) SendPhoto(ctx context.Context, chatID int64, paths []string, capti
 	files := make([]*os.File, 0, len(newPaths))
 	defer func() {
 		for _, f := range files {
-			_ = f.Close()
+			if err := f.Close(); err != nil {
+				slog.Warn("os.File Close (sendPhoto album)",
+					slog.String("name", f.Name()),
+					slog.String("err", err.Error()))
+			}
 		}
 	}()
 

@@ -81,7 +81,11 @@ func (b *Bot) SendStatus(ctx context.Context, channelID, replyTo, text string, o
 	if status.timer == nil {
 		cid := channelID
 		status.timer = time.AfterFunc(statusMinInterval-elapsed, func() {
-			_ = b.flushStatus(cid)
+			if err := b.flushStatus(cid); err != nil {
+				slog.Warn("flushStatus (timer)",
+					slog.String("channelId", cid),
+					slog.String("err", err.Error()))
+			}
 		})
 	}
 	b.statusMu.Unlock()
@@ -209,7 +213,11 @@ func (b *Bot) afterFlushStatus(channelID string, status *ChannelStatus, newID, n
 		delete(b.statuses, channelID)
 		b.statusMu.Unlock()
 
-		_ = b.doFinishChat(finishCtx, channelID, msgID, replyTo, reaction)
+		if err := b.doFinishChat(finishCtx, channelID, msgID, replyTo, reaction); err != nil {
+			slog.Warn("doFinishChat (after flush)",
+				slog.String("channelId", channelID),
+				slog.String("err", err.Error()))
+		}
 		close(done)
 		return
 	}
@@ -221,7 +229,11 @@ func (b *Bot) afterFlushStatus(channelID string, status *ChannelStatus, newID, n
 		}
 		cid := channelID
 		status.timer = time.AfterFunc(delay, func() {
-			_ = b.flushStatus(cid)
+			if err := b.flushStatus(cid); err != nil {
+				slog.Warn("flushStatus (timer pending)",
+					slog.String("channelId", cid),
+					slog.String("err", err.Error()))
+			}
 		})
 	}
 	b.statusMu.Unlock()

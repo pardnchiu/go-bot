@@ -3,6 +3,7 @@ package discord
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -30,9 +31,14 @@ func (b *Bot) Reply(handler ReplyHandler) {
 
 func replyHandler(ctx context.Context, handler ReplyHandler, input Input) (out string) {
 	defer func() {
-		if r := recover(); r != nil {
-			out = ""
+		r := recover()
+		if r == nil {
+			return
 		}
+		slog.Warn("reply handler panic",
+			slog.String("channelId", input.ChannelID),
+			slog.Any("recover", r))
+		out = ""
 	}()
 	return handler(ctx, input)
 }

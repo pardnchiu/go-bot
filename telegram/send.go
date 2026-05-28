@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 
 	tgBot "github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -65,8 +66,17 @@ func (b *Bot) Reply(handler ReplyHandler) {
 
 func replyHandler(ctx context.Context, handler ReplyHandler, input Input) (out string) {
 	defer func() {
-		if r := recover(); r != nil {
-			out = r.(string)
+		r := recover()
+		if r == nil {
+			return
+		}
+		slog.Warn("reply handler panic",
+			slog.Int64("chatId", input.ChatID),
+			slog.Any("recover", r))
+		if s, ok := r.(string); ok {
+			out = s
+		} else {
+			out = ""
 		}
 	}()
 	return handler(ctx, input)

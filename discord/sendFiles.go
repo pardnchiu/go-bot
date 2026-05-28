@@ -3,6 +3,7 @@ package discord
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -21,7 +22,11 @@ func (b *Bot) SendFiles(ctx context.Context, channelID, replyTo string, paths []
 	defer func() {
 		for _, f := range files {
 			if c, ok := f.Reader.(*os.File); ok {
-				c.Close()
+				if err := c.Close(); err != nil {
+					slog.Warn("os.File Close (sendFiles)",
+						slog.String("name", f.Name),
+						slog.String("err", err.Error()))
+				}
 			}
 		}
 	}()

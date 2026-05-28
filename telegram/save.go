@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -65,8 +66,16 @@ func (b *Bot) Save(ctx context.Context, fileID, dir string) (string, error) {
 	}
 	tmpPath := tmp.Name()
 	cleanup := func() {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
+		if err := tmp.Close(); err != nil {
+			slog.Warn("tmp.Close (cleanup)",
+				slog.String("tmpPath", tmpPath),
+				slog.String("err", err.Error()))
+		}
+		if err := os.Remove(tmpPath); err != nil && !os.IsNotExist(err) {
+			slog.Warn("os.Remove tmp (cleanup)",
+				slog.String("tmpPath", tmpPath),
+				slog.String("err", err.Error()))
+		}
 	}
 
 	written, err := io.Copy(tmp, io.LimitReader(resp.Body, maxFileBytes+1))
@@ -80,11 +89,19 @@ func (b *Bot) Save(ctx context.Context, fileID, dir string) (string, error) {
 	}
 
 	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpPath)
+		if rmErr := os.Remove(tmpPath); rmErr != nil && !os.IsNotExist(rmErr) {
+			slog.Warn("os.Remove tmp (after tmp.Close fail)",
+				slog.String("tmpPath", tmpPath),
+				slog.String("err", rmErr.Error()))
+		}
 		return "", fmt.Errorf("tmp.Close: %w", err)
 	}
 	if err := os.Rename(tmpPath, finalPath); err != nil {
-		_ = os.Remove(tmpPath)
+		if rmErr := os.Remove(tmpPath); rmErr != nil && !os.IsNotExist(rmErr) {
+			slog.Warn("os.Remove tmp (after os.Rename fail)",
+				slog.String("tmpPath", tmpPath),
+				slog.String("err", rmErr.Error()))
+		}
 		return "", fmt.Errorf("os.Rename: %w", err)
 	}
 	return finalPath, nil

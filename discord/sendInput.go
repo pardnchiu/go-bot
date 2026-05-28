@@ -102,13 +102,16 @@ func (b *Bot) handleInputButton(i *discordgo.InteractionCreate) {
 	state, ok := b.inputs[uuid]
 	b.inputsMu.Unlock()
 	if !ok {
-		_ = b.api.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		if err := b.api.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: "Expired",
 				Flags:   discordgo.MessageFlagsEphemeral,
 			},
-		})
+		}); err != nil {
+			slog.Warn("bwmarrin/discordgo Session.InteractionRespond (input button expired)",
+				slog.String("err", err.Error()))
+		}
 		return
 	}
 
@@ -156,13 +159,16 @@ func (b *Bot) handleInputModalSubmit(i *discordgo.InteractionCreate) {
 	}
 	b.inputsMu.Unlock()
 	if !ok {
-		_ = b.api.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		if err := b.api.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: "Expired",
 				Flags:   discordgo.MessageFlagsEphemeral,
 			},
-		})
+		}); err != nil {
+			slog.Warn("bwmarrin/discordgo Session.InteractionRespond (modal submit expired)",
+				slog.String("err", err.Error()))
+		}
 		return
 	}
 
@@ -209,6 +215,8 @@ func (b *Bot) handleInputModalSubmit(i *discordgo.InteractionCreate) {
 	handler := b.handler
 	b.handlerMu.RUnlock()
 	if handler == nil {
+		slog.Warn("Reply is not set",
+			slog.String("channelId", state.channelID))
 		return
 	}
 

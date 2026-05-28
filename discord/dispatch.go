@@ -42,6 +42,8 @@ func (b *Bot) dispatch(s *discordgo.Session, m *discordgo.MessageCreate) {
 	handler := b.handler
 	b.handlerMu.RUnlock()
 	if handler == nil {
+		slog.Warn("Reply is not set",
+			slog.String("channelId", m.ChannelID))
 		return
 	}
 

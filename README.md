@@ -1,6 +1,6 @@
 # go-bot
 
-不需暴露 HTTPS endpoint 的聊天平台 bot 封裝庫。實裝 Telegram（long polling）、Discord（WebSocket gateway）、TTS。
+聊天平台 bot 封裝庫。實裝 Telegram（long polling）、Discord（WebSocket gateway）、LINE（webhook）、TTS。Telegram / Discord 為 outbound 連線，本機 / NAT 後皆可跑；LINE 走 webhook（inbound），需公開 HTTPS endpoint。
 
 ## telegram
 
@@ -100,6 +100,37 @@ bot.SendMultiSelect(ctx, channelID, msgID, "選興趣", []string{"閱讀", "電�
 bot.SendStatus(ctx, channelID, msgID, "思考中...")
 bot.FinishStatus(ctx, channelID)
 bot.Delete(ctx, channelID, promptID)
+```
+
+## line
+
+底層 `line-bot-sdk-go/v8`；webhook server（inbound，需公開 HTTPS endpoint）。範疇最小：只有 `Reply` + `Send`，無互動元件。
+
+| API | 用途 |
+|---|---|
+| `New(secret, token, port, opts ...Option)` | 建立 `*Bot`；listen `:port` |
+| `Start(ctx)` | 驗 token + 起 webhook server |
+| `Close()` | 停止；冪等 |
+| `Status()` | `{Running, UserID, BasicID, DisplayName}` |
+| `Reply(handler)` | 註冊 sync handler；走 reply token 回覆 |
+| `Send(ctx, to, text)` | PushMessage 到指定 target（user / group / room id） |
+
+`Option`：`WithPath`（webhook path，預設 `/linebot/webhook`）
+
+`Input`：`SourceType / UserID / GroupID / RoomID / ReplyToken / MessageID / Text / Raw`
+
+需在 LINE Developer Console 回填 webhook URL（`https://<domain>/linebot/webhook`）、開 **Use webhook**、關 auto-reply。
+
+```go
+bot, _ := line.New(secret, token, "16722")
+defer bot.Close()
+
+bot.Reply(func(ctx context.Context, in line.Input) string {
+    return "echo: " + in.Text
+})
+bot.Start(ctx)
+
+bot.Send(ctx, userID, "hello")
 ```
 
 ## tts

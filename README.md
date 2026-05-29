@@ -114,12 +114,13 @@ bot.Delete(ctx, channelID, promptID)
 | `Status()` | `{Running, UserID, BasicID, DisplayName}` |
 | `Reply(handler)` | 註冊 sync handler；走 reply token 回覆 |
 | `Send(ctx, to, text)` | PushMessage 到指定 target（user / group / room id） |
+| `Save(ctx, messageID, dir)` | 下載 image/video/audio/file 訊息內容落地；UUID 命名；50 MiB cap |
 
 `Option`：`WithPath`（webhook path，預設 `/linebot/webhook`）
 
-`Input`：`SourceType / UserID / Username / GroupID / RoomID / ReplyToken / MessageID / Text / Raw`
+`Input`：`SourceType / UserID / Username / GroupID / RoomID / ReplyToken / MessageID / MessageType / Text / FileName / Raw`
 
-`Username` 為 sender DisplayName，dispatch 依 source type 自動打 profile API 取得（每訊息一次 REST，best-effort）。
+`Username` 為 sender DisplayName，dispatch 依 source type 自動打 profile API 取得（每訊息一次 REST，best-effort）。`MessageType` 為 `text/image/video/audio/file`；非 text 訊息走 `Save(ctx, in.MessageID, dir)` 落地。
 
 需在 LINE Developer Console 回填 webhook URL（`https://<domain>/linebot/webhook`）、開 **Use webhook**、關 auto-reply。
 
@@ -128,6 +129,10 @@ bot, _ := line.New(secret, token, "16722")
 defer bot.Close()
 
 bot.Reply(func(ctx context.Context, in line.Input) string {
+    if in.MessageType != "text" {
+        path, _ := bot.Save(ctx, in.MessageID, "./tmp")
+        return "saved: " + path
+    }
     return "echo: " + in.Text
 })
 bot.Start(ctx)

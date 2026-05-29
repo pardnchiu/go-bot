@@ -67,8 +67,35 @@ func (b *Bot) handleEvent(ctx context.Context, event *linebot.Event) {
 	if event.Type != linebot.EventTypeMessage {
 		return
 	}
-	msg, ok := event.Message.(*linebot.TextMessage)
-	if !ok {
+
+	in := Input{
+		SourceType: string(event.Source.Type),
+		UserID:     event.Source.UserID,
+		Username:   b.displayName(ctx, event.Source),
+		GroupID:    event.Source.GroupID,
+		RoomID:     event.Source.RoomID,
+		ReplyToken: event.ReplyToken,
+		Raw:        event,
+	}
+	switch m := event.Message.(type) {
+	case *linebot.TextMessage:
+		in.MessageType = "text"
+		in.MessageID = m.ID
+		in.Text = m.Text
+	case *linebot.ImageMessage:
+		in.MessageType = "image"
+		in.MessageID = m.ID
+	case *linebot.VideoMessage:
+		in.MessageType = "video"
+		in.MessageID = m.ID
+	case *linebot.AudioMessage:
+		in.MessageType = "audio"
+		in.MessageID = m.ID
+	case *linebot.FileMessage:
+		in.MessageType = "file"
+		in.MessageID = m.ID
+		in.FileName = m.FileName
+	default:
 		return
 	}
 
@@ -81,17 +108,7 @@ func (b *Bot) handleEvent(ctx context.Context, event *linebot.Event) {
 		return
 	}
 
-	reply := replyHandler(ctx, handler, Input{
-		SourceType: string(event.Source.Type),
-		UserID:     event.Source.UserID,
-		Username:   b.displayName(ctx, event.Source),
-		GroupID:    event.Source.GroupID,
-		RoomID:     event.Source.RoomID,
-		ReplyToken: event.ReplyToken,
-		MessageID:  msg.ID,
-		Text:       msg.Text,
-		Raw:        event,
-	})
+	reply := replyHandler(ctx, handler, in)
 	if reply == "" {
 		return
 	}

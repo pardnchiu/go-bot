@@ -9,15 +9,17 @@ import (
 )
 
 type Input struct {
-	SourceType string
-	UserID     string
-	Username   string
-	GroupID    string
-	RoomID     string
-	ReplyToken string
-	MessageID  string
-	Text       string
-	Raw        *linebot.Event
+	SourceType  string
+	UserID      string
+	Username    string
+	GroupID     string
+	RoomID      string
+	ReplyToken  string
+	MessageID   string
+	MessageType string
+	Text        string
+	FileName    string
+	Raw         *linebot.Event
 }
 
 type ReplyHandler func(ctx context.Context, input Input) string

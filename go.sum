@@ -4,6 +4,8 @@ github.com/go-telegram/bot v1.20.0 h1:4Pea/qTidSspr4WBJw9FbHUMNhYeqszBqQUfsQEyFb
 github.com/go-telegram/bot v1.20.0/go.mod h1:i2TRs7fXWIeaceF3z7KzsMt/he0TwkVC680mvdTFYeM=
 github.com/gorilla/websocket v1.4.2 h1:+/TMaTYc4QFitKJxsQ7Yye35DkWvkdLcvGKqM+x0Ufc=
 github.com/gorilla/websocket v1.4.2/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
+github.com/line/line-bot-sdk-go/v8 v8.18.0 h1:YbkGTFixMwTFtWhWwdu6lExbkuQGUCFHukLtC7YeMO4=
+github.com/line/line-bot-sdk-go/v8 v8.18.0/go.mod h1:AeSRUuu7WGgveGDJb6DyKyFUOst2UB2aF6LO2cQeuXs=
 github.com/pardnchiu/go-pkg v0.12.3 h1:AHPMuOPf+nkYt2XtINdF19vAyTp2TzCzUS8FEORygAQ=
 github.com/pardnchiu/go-pkg v0.12.3/go.mod h1:GvipswsQHxvDNaVI34pANoS+/VCD8ApUSEbadVpHSJg=
 golang.org/x/crypto v0.0.0-20210421170649-83a5a9bb288b h1:7mWr3k41Qtv8XlltBkDkl8LoP3mpSgBW8BUoxtEdbXg=

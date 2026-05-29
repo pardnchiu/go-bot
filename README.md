@@ -117,7 +117,9 @@ bot.Delete(ctx, channelID, promptID)
 
 `Option`：`WithPath`（webhook path，預設 `/linebot/webhook`）
 
-`Input`：`SourceType / UserID / GroupID / RoomID / ReplyToken / MessageID / Text / Raw`
+`Input`：`SourceType / UserID / Username / GroupID / RoomID / ReplyToken / MessageID / Text / Raw`
+
+`Username` 為 sender DisplayName，dispatch 依 source type 自動打 profile API 取得（每訊息一次 REST，best-effort）。
 
 需在 LINE Developer Console 回填 webhook URL（`https://<domain>/linebot/webhook`）、開 **Use webhook**、關 auto-reply。
 

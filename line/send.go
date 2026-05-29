@@ -11,6 +11,7 @@ import (
 type Input struct {
 	SourceType string
 	UserID     string
+	Username   string
 	GroupID    string
 	RoomID     string
 	ReplyToken string

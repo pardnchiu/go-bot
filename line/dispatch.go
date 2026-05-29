@@ -39,6 +39,30 @@ func (b *Bot) webhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (b *Bot) displayName(ctx context.Context, src *linebot.EventSource) string {
+	if src == nil || src.UserID == "" {
+		return ""
+	}
+	var res *linebot.UserProfileResponse
+	var err error
+	switch src.Type {
+	case linebot.EventSourceTypeGroup:
+		res, err = b.api.GetGroupMemberProfile(src.GroupID, src.UserID).WithContext(ctx).Do()
+	case linebot.EventSourceTypeRoom:
+		res, err = b.api.GetRoomMemberProfile(src.RoomID, src.UserID).WithContext(ctx).Do()
+	default:
+		res, err = b.api.GetProfile(src.UserID).WithContext(ctx).Do()
+	}
+	if err != nil {
+		slog.Warn("line-bot-sdk-go GetProfile",
+			slog.String("userId", src.UserID),
+			slog.String("sourceType", string(src.Type)),
+			slog.String("err", err.Error()))
+		return ""
+	}
+	return res.DisplayName
+}
+
 func (b *Bot) handleEvent(ctx context.Context, event *linebot.Event) {
 	if event.Type != linebot.EventTypeMessage {
 		return
@@ -60,6 +84,7 @@ func (b *Bot) handleEvent(ctx context.Context, event *linebot.Event) {
 	reply := replyHandler(ctx, handler, Input{
 		SourceType: string(event.Source.Type),
 		UserID:     event.Source.UserID,
+		Username:   b.displayName(ctx, event.Source),
 		GroupID:    event.Source.GroupID,
 		RoomID:     event.Source.RoomID,
 		ReplyToken: event.ReplyToken,

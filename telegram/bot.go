@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -50,6 +51,13 @@ func New(token string, opts ...Option) (*Bot, error) {
 	sdkOpts := []tgBot.Option{
 		tgBot.WithDefaultHandler(bot.dispatch),
 		tgBot.WithErrorsHandler(func(err error) {
+			var rateErr *tgBot.TooManyRequestsError
+			if errors.As(err, &rateErr) && rateErr.RetryAfter > 0 {
+				slog.Warn("Bot rate limited",
+					slog.Int("retry_after", rateErr.RetryAfter))
+				time.Sleep(time.Duration(rateErr.RetryAfter) * time.Second)
+				return
+			}
 			slog.Warn("Bot.New",
 				slog.String("err", err.Error()))
 		}),

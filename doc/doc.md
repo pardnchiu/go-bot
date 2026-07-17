@@ -18,6 +18,17 @@
 go get github.com/pardnchiu/go-bot
 ```
 
+Import platform packages from the `core/` tree:
+
+```go
+import (
+    "github.com/pardnchiu/go-bot/core/telegram"
+    "github.com/pardnchiu/go-bot/core/discord"
+    "github.com/pardnchiu/go-bot/core/line"
+    "github.com/pardnchiu/go-bot/core/tts"
+)
+```
+
 ### Build the included contract examples
 
 ```bash
@@ -56,7 +67,7 @@ import (
     "context"
     "log"
 
-    "github.com/pardnchiu/go-bot/telegram"
+    "github.com/pardnchiu/go-bot/core/telegram"
 )
 
 func main() {
@@ -86,7 +97,7 @@ import (
     "context"
     "log"
 
-    "github.com/pardnchiu/go-bot/discord"
+    "github.com/pardnchiu/go-bot/core/discord"
 )
 
 func main() {
@@ -127,9 +138,9 @@ make line-send TEXT="hello"
 
 ### Shared convention
 
-Each platform exposes `New`, `Start`, `Close`, `Status`, and `Reply`. `Reply` accepts a synchronous handler and sends its non-empty return value to the source conversation. `Close` is idempotent.
+Each platform under `core/` exposes `New`, `Start`, `Close`, `Status`, and `Reply`. `Reply` accepts a synchronous handler and sends its non-empty return value to the source conversation. `Close` is idempotent.
 
-### Telegram
+### Telegram (`core/telegram`)
 
 | API | Signature / purpose |
 |---|---|
@@ -137,11 +148,11 @@ Each platform exposes `New`, `Start`, `Close`, `Status`, and `Reply`. `Reply` ac
 | Messaging | `Send`, `Delete`, `SendFile`, `SendPhoto`, `SendVoice` |
 | Interaction | `SendInput`, `SendSelect`, `SendMultiSelect` |
 | Status | `SendStatus`, `FinishStatus` |
-| Download | `SaveFile(ctx, fileID, dir)`; 20 MB cap |
+| Download | `Save(ctx, fileID, dir)` or `SaveFile`; 20 MB cap |
 
-`WithHTTPClient` and `WithPollTimeout` configure polling. `WithSendType` selects plain text, MarkdownV2, or HTML.
+`WithHTTPClient` and `WithPollTimeout` configure polling. `WithSendType` selects plain text, MarkdownV2, or HTML. In groups and supergroups, messages must mention the bot before the reply handler runs.
 
-### Discord
+### Discord (`core/discord`)
 
 | API | Signature / purpose |
 |---|---|
@@ -153,7 +164,7 @@ Each platform exposes `New`, `Start`, `Close`, `Status`, and `Reply`. `Reply` ac
 
 Discord input uses a button-to-modal flow; select menus return a single `Text` value or `CallbackPicks` for multi-select.
 
-### LINE
+### LINE (`core/line`)
 
 | API | Signature / purpose |
 |---|---|
@@ -162,9 +173,9 @@ Discord input uses a button-to-modal flow; select menus return a single `Text` v
 | Download | `Save(ctx, messageID, dir)`; 50 MiB cap |
 | Webhook path | `line.WithPath(path)` |
 
-LINE handles text, image, video, audio, and file message events. It intentionally does not provide the Telegram or Discord interaction components.
+LINE handles text, image, video, audio, and file message events. Group and room text messages must mention the bot user ID. Interaction components are intentionally omitted.
 
-### Text to speech
+### Text to speech (`core/tts`)
 
 ```go
 func Get(ctx context.Context, apiKey, text string) ([]byte, error)

@@ -8,12 +8,12 @@
 <p align="center">
 <a href="https://pkg.go.dev/github.com/pardnchiu/go-bot"><img src="https://img.shields.io/badge/GO-REFERENCE-blue?include_prereleases&style=for-the-badge" alt="Go Reference"></a>
 <a href="https://github.com/pardnchiu/go-bot/releases"><img src="https://img.shields.io/github/v/tag/pardnchiu/go-bot?include_prereleases&style=for-the-badge" alt="Release"></a>
-<a href="../LICENSE"><img src="https://img.shields.io/github/license/pardnchiu/go-bot?include_prereleases&style=for-the-badge" alt="License"></a>
+<a href="../../LICENSE"><img src="https://img.shields.io/github/license/pardnchiu/go-bot?include_prereleases&style=for-the-badge" alt="License"></a>
 </p>
 
 ***
 
-> Go 聊天機器人函式庫，具備統一回覆、原生互動與跨平台媒體傳送
+> Go 聊天機器人函式庫，以 core/ 統一版面，支援多平台原生互動與回覆
 
 ## 目錄
 - [功能特點](#功能特點)
@@ -25,11 +25,11 @@
 
 > `go get github.com/pardnchiu/go-bot` · [完整文件](./doc.zh.md)
 
-- **原生平台生命週期** — Telegram long polling、Discord Gateway 與 LINE webhook 各自保留正確的連線模型，同時提供一致 Bot API。
+- **core/ 套件版面** — Telegram、Discord、LINE 與 TTS 集中在 `core/`，平台 adapter 與文件共用同一 import 根。
+- **原生平台生命週期** — Telegram long polling、Discord Gateway 與 LINE webhook 各自保留正確連線模型，並提供一致 Bot API。
 - **同步回覆契約** — 註冊單一 `Reply` handler，回傳非空字串時便自動回覆觸發訊息。
-- **互動元件整合** — Telegram 鍵盤與 ForceReply、Discord 選單與 Modal 都回到相同的 handler 輸入模型。
+- **互動元件整合** — Telegram 鍵盤與 ForceReply、Discord 選單與 Modal 都回到相同 handler 輸入模型。
 - **媒體處理封裝** — 以串流上傳、大小上限、UUID 檔名與可取消 Context 處理各平台媒體。
-- **狀態訊息管理** — 每個 chat 或 channel 的思考中訊息會節流更新，結束時清除 reaction 與訊息。
 
 ## 架構
 
@@ -37,10 +37,12 @@
 
 ```mermaid
 graph TB
-    App[應用程式] --> TG[telegram]
-    App --> DC[discord]
-    App --> LN[line]
-    TG --> TTS[tts]
+    App[應用程式] --> Core[core/]
+    Core --> TG[telegram]
+    Core --> DC[discord]
+    Core --> LN[line]
+    Core --> TTS[tts]
+    TG --> TTS
     DC --> TTS
     TG --> TelegramAPI[Telegram API]
     DC --> DiscordAPI[Discord Gateway/API]

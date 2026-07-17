@@ -9,7 +9,7 @@ import (
 	tgBot "github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
-	"github.com/pardnchiu/go-bot/tts"
+	"github.com/pardnchiu/go-bot/core/tts"
 )
 
 type SendType int
@@ -109,7 +109,7 @@ func (b *Bot) Delete(ctx context.Context, chatID int64, msgID int) error {
 func (b *Bot) SendVoice(ctx context.Context, chatID int64, text, apiKey string, caption ...string) (*models.Message, error) {
 	ogg, err := tts.Get(ctx, apiKey, text)
 	if err != nil {
-		return nil, fmt.Errorf("github.com/pardnchiu/go-bot/tts Get: %w", err)
+		return nil, fmt.Errorf("github.com/pardnchiu/go-bot/core/tts Get: %w", err)
 	}
 	params := &tgBot.SendVoiceParams{
 		ChatID: chatID,

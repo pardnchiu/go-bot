@@ -7,7 +7,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/pardnchiu/go-bot/tts"
+	"github.com/pardnchiu/go-bot/core/tts"
 )
 
 func (b *Bot) SendVoice(ctx context.Context, channelID, replyTo, text, apiKey string, caption ...string) (*discordgo.Message, error) {
@@ -20,7 +20,7 @@ func (b *Bot) SendVoice(ctx context.Context, channelID, replyTo, text, apiKey st
 
 	ogg, err := tts.Get(ctx, apiKey, text)
 	if err != nil {
-		return nil, fmt.Errorf("github.com/pardnchiu/go-bot/tts Get: %w", err)
+		return nil, fmt.Errorf("github.com/pardnchiu/go-bot/core/tts Get: %w", err)
 	}
 
 	data := &discordgo.MessageSend{

@@ -18,6 +18,17 @@
 go get github.com/pardnchiu/go-bot
 ```
 
+平台套件改從 `core/` 匯入：
+
+```go
+import (
+    "github.com/pardnchiu/go-bot/core/telegram"
+    "github.com/pardnchiu/go-bot/core/discord"
+    "github.com/pardnchiu/go-bot/core/line"
+    "github.com/pardnchiu/go-bot/core/tts"
+)
+```
+
 ### 建置內附契約範例
 
 ```bash
@@ -56,7 +67,7 @@ import (
     "context"
     "log"
 
-    "github.com/pardnchiu/go-bot/telegram"
+    "github.com/pardnchiu/go-bot/core/telegram"
 )
 
 func main() {
@@ -86,7 +97,7 @@ import (
     "context"
     "log"
 
-    "github.com/pardnchiu/go-bot/discord"
+    "github.com/pardnchiu/go-bot/core/discord"
 )
 
 func main() {
@@ -127,9 +138,9 @@ make line-send TEXT="hello"
 
 ### 共通慣例
 
-每個平台都提供 `New`、`Start`、`Close`、`Status` 與 `Reply`。`Reply` 接受同步 handler，非空回傳值會送回來源對話；`Close` 可重複呼叫。
+`core/` 下每個平台都提供 `New`、`Start`、`Close`、`Status` 與 `Reply`。`Reply` 接受同步 handler，非空回傳值會送回來源對話；`Close` 可重複呼叫。
 
-### Telegram
+### Telegram（`core/telegram`）
 
 | API | 簽章／用途 |
 |---|---|
@@ -137,11 +148,11 @@ make line-send TEXT="hello"
 | 訊息 | `Send`、`Delete`、`SendFile`、`SendPhoto`、`SendVoice` |
 | 互動 | `SendInput`、`SendSelect`、`SendMultiSelect` |
 | 狀態 | `SendStatus`、`FinishStatus` |
-| 下載 | `SaveFile(ctx, fileID, dir)`；20 MB 上限 |
+| 下載 | `Save(ctx, fileID, dir)` 或 `SaveFile`；20 MB 上限 |
 
-`WithHTTPClient` 與 `WithPollTimeout` 用於設定 polling；`WithSendType` 可選 plain text、MarkdownV2 或 HTML。
+`WithHTTPClient` 與 `WithPollTimeout` 用於設定 polling；`WithSendType` 可選 plain text、MarkdownV2 或 HTML。群組與超級群組訊息必須 mention bot 才會進入 reply handler。
 
-### Discord
+### Discord（`core/discord`）
 
 | API | 簽章／用途 |
 |---|---|
@@ -153,7 +164,7 @@ make line-send TEXT="hello"
 
 Discord 的輸入流程由按鈕開啟 Modal；選單會以 `Text` 回傳單選結果，或以 `CallbackPicks` 回傳多選結果。
 
-### LINE
+### LINE（`core/line`）
 
 | API | 簽章／用途 |
 |---|---|
@@ -162,9 +173,9 @@ Discord 的輸入流程由按鈕開啟 Modal；選單會以 `Text` 回傳單選�
 | 下載 | `Save(ctx, messageID, dir)`；50 MiB 上限 |
 | Webhook path | `line.WithPath(path)` |
 
-LINE 處理 text、image、video、audio 與 file 事件；刻意不提供 Telegram 或 Discord 的互動元件。
+LINE 處理 text、image、video、audio 與 file 事件；group / room 文字訊息必須 mention bot 的 user ID。刻意不提供互動元件。
 
-### 文字轉語音
+### 文字轉語音（`core/tts`）
 
 ```go
 func Get(ctx context.Context, apiKey, text string) ([]byte, error)

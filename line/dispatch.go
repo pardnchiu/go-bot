@@ -63,6 +63,28 @@ func (b *Bot) displayName(ctx context.Context, src *linebot.EventSource) string 
 	return res.DisplayName
 }
 
+func isGroupSource(t linebot.EventSourceType) bool {
+	return t == linebot.EventSourceTypeGroup || t == linebot.EventSourceTypeRoom
+}
+
+func (b *Bot) isMentioned(mention *linebot.Mention) bool {
+	if mention == nil {
+		return false
+	}
+	b.mu.Lock()
+	botUserID := ""
+	if b.info != nil {
+		botUserID = b.info.UserID
+	}
+	b.mu.Unlock()
+	for _, mentionee := range mention.Mentionees {
+		if mentionee.Type == linebot.MentionedTargetTypeUser && mentionee.UserID == botUserID {
+			return true
+		}
+	}
+	return false
+}
+
 func (b *Bot) handleEvent(ctx context.Context, event *linebot.Event) {
 	if event.Type != linebot.EventTypeMessage {
 		return
@@ -79,6 +101,9 @@ func (b *Bot) handleEvent(ctx context.Context, event *linebot.Event) {
 	}
 	switch m := event.Message.(type) {
 	case *linebot.TextMessage:
+		if isGroupSource(event.Source.Type) && !b.isMentioned(m.Mention) {
+			return
+		}
 		in.MessageType = "text"
 		in.MessageID = m.ID
 		in.Text = m.Text

@@ -4,27 +4,32 @@
 
 ## 概覽
 
+平台 adapter 與共用 TTS 已集中到 `core/`。應用程式改 import `github.com/pardnchiu/go-bot/core/<platform>`，各套件仍沿用相同的 `Reply` 慣例。
+
 ```mermaid
 graph TB
-    Client[應用程式] --> Telegram[telegram 套件]
-    Client --> Discord[discord 套件]
-    Client --> Line[line 套件]
+    Client[應用程式] --> Core[core/]
+    Core --> Telegram[core/telegram]
+    Core --> Discord[core/discord]
+    Core --> Line[core/line]
+    Core --> TTS[core/tts]
     Telegram --> TGSDK[go-telegram/bot]
     Discord --> DGSDK[discordgo]
     Line --> LNSDK[LINE Bot SDK]
-    Telegram --> TTS[tts 套件]
+    Telegram --> TTS
     Discord --> TTS
     TTS --> Gemini[Gemini API]
     TTS --> FFmpeg[ffmpeg]
 ```
 
-## 模組：Telegram
+## 模組：core/telegram
 
-Telegram adapter 負責 long-polling 生命週期、同步派送 update，並將平台功能對應至套件 API。
+Telegram adapter 負責 long-polling 生命週期、同步派送 update、以 bot mention 閘住群組流量，並將平台功能對應至套件 API。
 
 ```mermaid
 graph TB
-    Update[Telegram Update] --> Dispatch[派送器]
+    Update[Telegram Update] --> Gate[群組 mention 閘門]
+    Gate --> Dispatch[派送器]
     Dispatch --> Handler[ReplyHandler]
     Handler --> Reply[SendMessage 回覆]
     Dispatch --> Callback[Callback 派送]
@@ -35,7 +40,7 @@ graph TB
     Bot --> Media[檔案與圖片 helper]
 ```
 
-## 模組：Discord
+## 模組：core/discord
 
 Discord adapter 管理 Gateway session，並使用 Discord 原生 component 完成互動流程。
 
@@ -52,15 +57,16 @@ graph TB
     Bot --> Media[附件與語音]
 ```
 
-## 模組：LINE
+## 模組：core/line
 
-LINE adapter 執行 inbound HTTP webhook server，API 範圍限定於回覆、PushMessage 與媒體儲存。
+LINE adapter 執行 inbound HTTP webhook server，以 bot mention 閘住 group / room 文字訊息，API 範圍限定於回覆、PushMessage 與媒體儲存。
 
 ```mermaid
 graph TB
     LINE[LINE 平台] --> Webhook[HTTP webhook]
     Webhook --> Parse[驗證簽章的 ParseRequest]
-    Parse --> Event[文字或媒體事件]
+    Parse --> Gate[群組／聊天室 mention 閘門]
+    Gate --> Event[文字或媒體事件]
     Event --> Profile[盡力取得使用者資料]
     Profile --> Handler[ReplyHandler]
     Handler --> Reply[Reply token 回覆]
@@ -68,7 +74,7 @@ graph TB
     Event --> Save[媒體儲存]
 ```
 
-## 模組：文字轉語音
+## 模組：core/tts
 
 TTS 套件會將文字請求轉為可供 Telegram 與 Discord 傳送 helper 使用的音訊 bytes。
 
@@ -88,7 +94,7 @@ graph LR
 sequenceDiagram
     participant User as 使用者
     participant Platform as 平台
-    participant Adapter as 平台 adapter
+    participant Adapter as core 平台 adapter
     participant Handler as ReplyHandler
     User->>Platform: 訊息或互動
     Platform->>Adapter: 平台事件

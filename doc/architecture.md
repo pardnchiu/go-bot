@@ -4,27 +4,32 @@
 
 ## Overview
 
+Platform adapters and shared TTS now live under `core/`. Applications import `github.com/pardnchiu/go-bot/core/<platform>` and keep the same `Reply` convention across packages.
+
 ```mermaid
 graph TB
-    Client[Application] --> Telegram[telegram package]
-    Client --> Discord[discord package]
-    Client --> Line[line package]
+    Client[Application] --> Core[core/]
+    Core --> Telegram[core/telegram]
+    Core --> Discord[core/discord]
+    Core --> Line[core/line]
+    Core --> TTS[core/tts]
     Telegram --> TGSDK[go-telegram/bot]
     Discord --> DGSDK[discordgo]
     Line --> LNSDK[LINE Bot SDK]
-    Telegram --> TTS[tts package]
+    Telegram --> TTS
     Discord --> TTS
     TTS --> Gemini[Gemini API]
     TTS --> FFmpeg[ffmpeg]
 ```
 
-## Module: Telegram
+## Module: core/telegram
 
-The Telegram adapter owns long-polling lifecycle, dispatches updates synchronously, and maps platform features to the package API.
+The Telegram adapter owns long-polling lifecycle, dispatches updates synchronously, gates group traffic behind bot mentions, and maps platform features to the package API.
 
 ```mermaid
 graph TB
-    Update[Telegram Update] --> Dispatch[dispatch]
+    Update[Telegram Update] --> Gate[Group mention gate]
+    Gate --> Dispatch[dispatch]
     Dispatch --> Handler[ReplyHandler]
     Handler --> Reply[SendMessage reply]
     Dispatch --> Callback[Callback dispatch]
@@ -35,7 +40,7 @@ graph TB
     Bot --> Media[File and photo helpers]
 ```
 
-## Module: Discord
+## Module: core/discord
 
 The Discord adapter manages a Gateway session and uses Discord-native components for interaction flows.
 
@@ -52,15 +57,16 @@ graph TB
     Bot --> Media[Attachments and voice]
 ```
 
-## Module: LINE
+## Module: core/line
 
-The LINE adapter runs an inbound HTTP webhook server and keeps the API surface limited to replies, push messages, and media persistence.
+The LINE adapter runs an inbound HTTP webhook server, gates group and room text messages behind bot mentions, and keeps the API surface limited to replies, push messages, and media persistence.
 
 ```mermaid
 graph TB
     LINE[LINE Platform] --> Webhook[HTTP webhook]
     Webhook --> Parse[Signature-validated ParseRequest]
-    Parse --> Event[Text or media event]
+    Parse --> Gate[Group/room mention gate]
+    Gate --> Event[Text or media event]
     Event --> Profile[Best-effort profile lookup]
     Profile --> Handler[ReplyHandler]
     Handler --> Reply[Reply token response]
@@ -68,7 +74,7 @@ graph TB
     Event --> Save[Media Save]
 ```
 
-## Module: Text to Speech
+## Module: core/tts
 
 The TTS package converts a text request into audio bytes consumable by Telegram and Discord send helpers.
 
@@ -88,7 +94,7 @@ graph LR
 sequenceDiagram
     participant User
     participant Platform
-    participant Adapter as Platform adapter
+    participant Adapter as core platform adapter
     participant Handler as ReplyHandler
     User->>Platform: message or interaction
     Platform->>Adapter: platform event

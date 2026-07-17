@@ -22,6 +22,34 @@ func chatName(c *models.Chat) string {
 	return strings.TrimSpace(c.FirstName + " " + c.LastName)
 }
 
+func isGroupChat(t models.ChatType) bool {
+	return t == models.ChatTypeGroup || t == models.ChatTypeSupergroup
+}
+
+func (b *Bot) isMentioned(msg *models.Message) bool {
+	b.mu.Lock()
+	botUsername := ""
+	if b.me != nil {
+		botUsername = b.me.Username
+	}
+	b.mu.Unlock()
+	if botUsername == "" {
+		return false
+	}
+	for _, entity := range msg.Entities {
+		if entity.Type != models.MessageEntityTypeMention {
+			continue
+		}
+		if entity.Offset < 0 || entity.Offset+entity.Length > len(msg.Text) {
+			continue
+		}
+		if msg.Text[entity.Offset:entity.Offset+entity.Length] == "@"+botUsername {
+			return true
+		}
+	}
+	return false
+}
+
 func (b *Bot) dispatch(ctx context.Context, _ *tgBot.Bot, update *models.Update) {
 	if update == nil {
 		return
@@ -35,6 +63,10 @@ func (b *Bot) dispatch(ctx context.Context, _ *tgBot.Bot, update *models.Update)
 	}
 
 	msg := update.Message
+	if isGroupChat(msg.Chat.Type) && !b.isMentioned(msg) {
+		return
+	}
+
 	var userID int64
 	var username string
 	if msg.From != nil {

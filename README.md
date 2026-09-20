@@ -25,7 +25,7 @@
 
 > `go get github.com/pardnchiu/go-bot` · [Documentation](./doc/doc.md)
 
-- **core/ package layout** — Telegram, Discord, LINE, and TTS live under `core/`, so platform adapters and docs share one import root.
+- **core/ package layout** — Telegram, Discord, and LINE live under `core/`, so platform adapters and docs share one import root.
 - **Platform-native lifecycles** — Telegram polling, Discord Gateway, and LINE webhooks keep each platform’s transport model behind consistent bot APIs.
 - **Synchronous reply contract** — Register one `Reply` handler; a non-empty return value is sent as the reply to the triggering message.
 - **Interaction primitives** — Telegram keyboards and ForceReply plus Discord select menus and modals route user input back into the same handler model.
@@ -41,9 +41,6 @@ graph TB
     Core --> TG[telegram]
     Core --> DC[discord]
     Core --> LN[line]
-    Core --> TTS[tts]
-    TG --> TTS
-    DC --> TTS
     TG --> TelegramAPI[Telegram API]
     DC --> DiscordAPI[Discord Gateway/API]
     LN --> LineAPI[LINE Webhook/API]

@@ -6,8 +6,6 @@
 
 - Go 1.25.0 or later.
 - A platform token for the bot you use: Telegram, Discord, or LINE.
-- `ffmpeg` in `PATH` when using `tts.Get`, `telegram.SendVoice`, or `discord.SendVoice`.
-- A Gemini API key for text-to-speech.
 - A public HTTPS endpoint for LINE webhooks; Telegram and Discord connect outbound and can run behind NAT.
 
 ## Installation
@@ -25,7 +23,6 @@ import (
     "github.com/pardnchiu/go-bot/core/telegram"
     "github.com/pardnchiu/go-bot/core/discord"
     "github.com/pardnchiu/go-bot/core/line"
-    "github.com/pardnchiu/go-bot/core/tts"
 )
 ```
 
@@ -52,7 +49,6 @@ The examples read credentials from `.env`, which Make includes directly. Keep va
 | `LINEBOT_TO` | LINE send | `cmd/line` | User, group, or room target ID |
 | `LINEBOT_PORT` | No | `cmd/line` | Webhook port; defaults to `16722` |
 | `LINEBOT_WEBHOOK` | No | `cmd/line` | Webhook path; defaults to `/linebot/webhook` |
-| `GEMINI_API_KEY` or `GOOGLE_API_KEY` | voice only | examples | Gemini TTS API key |
 
 For Discord message bodies, enable **Message Content Intent** in the Developer Portal.
 
@@ -145,19 +141,19 @@ Each platform under `core/` exposes `New`, `Start`, `Close`, `Status`, and `Repl
 | API | Signature / purpose |
 |---|---|
 | Constructor | `telegram.New(token, opts ...Option)` |
-| Messaging | `Send`, `Delete`, `SendFile`, `SendPhoto`, `SendVoice` |
+| Messaging | `Send`, `Delete`, `SendFile`, `SendPhoto`, `SendVoice(path)` |
 | Interaction | `SendInput`, `SendSelect`, `SendMultiSelect` |
 | Status | `SendStatus`, `FinishStatus` |
-| Download | `Save(ctx, fileID, dir)` or `SaveFile`; 20 MB cap |
+| Download | `Save(ctx, fileID, dir)`; 20 MiB cap |
 
-`WithHTTPClient` and `WithPollTimeout` configure polling. `WithSendType` selects plain text, MarkdownV2, or HTML. In groups and supergroups, messages must mention the bot before the reply handler runs.
+`WithHTTPClient` and `WithPollTimeout` configure polling. `WithSendType` selects plain text, MarkdownV2, or HTML. `SendVoice` uploads an existing OGG/OPUS file; produce the audio outside the library.
 
 ### Discord (`core/discord`)
 
 | API | Signature / purpose |
 |---|---|
 | Constructor | `discord.New(token)` |
-| Messaging | `Send`, `Delete`, `SendFiles`, `SendVoice` |
+| Messaging | `Send`, `Delete`, `SendFiles`, `SendVoice(path)` |
 | Interaction | `SendInput`, `SendSelect`, `SendMultiSelect` |
 | Status | `SendStatus`, `FinishStatus` |
 | Download | `Save(ctx, attachment, dir)`; 25 MiB cap |
@@ -173,15 +169,7 @@ Discord input uses a button-to-modal flow; select menus return a single `Text` v
 | Download | `Save(ctx, messageID, dir)`; 50 MiB cap |
 | Webhook path | `line.WithPath(path)` |
 
-LINE handles text, image, video, audio, and file message events. Group and room text messages must mention the bot user ID. Interaction components are intentionally omitted.
-
-### Text to speech (`core/tts`)
-
-```go
-func Get(ctx context.Context, apiKey, text string) ([]byte, error)
-```
-
-`tts.Get` requests Gemini audio, converts PCM to OGG/OPUS with `ffmpeg`, and returns the encoded bytes.
+LINE handles text, image, video, audio, and file message events. Interaction components are intentionally omitted.
 
 ***
 

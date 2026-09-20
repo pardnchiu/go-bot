@@ -6,8 +6,6 @@
 
 - Go 1.25.0 或更新版本。
 - 使用的 Bot 平台憑證：Telegram、Discord 或 LINE。
-- 使用 `tts.Get`、`telegram.SendVoice` 或 `discord.SendVoice` 時，系統 `PATH` 必須有 `ffmpeg`。
-- 文字轉語音需要 Gemini API key。
 - LINE webhook 需要公開 HTTPS endpoint；Telegram 與 Discord 為 outbound 連線，可在 NAT 後執行。
 
 ## 安裝
@@ -25,7 +23,6 @@ import (
     "github.com/pardnchiu/go-bot/core/telegram"
     "github.com/pardnchiu/go-bot/core/discord"
     "github.com/pardnchiu/go-bot/core/line"
-    "github.com/pardnchiu/go-bot/core/tts"
 )
 ```
 
@@ -52,7 +49,6 @@ go build ./...
 | `LINEBOT_TO` | LINE 傳送 | `cmd/line` | User、group 或 room target ID |
 | `LINEBOT_PORT` | 否 | `cmd/line` | Webhook port；預設 `16722` |
 | `LINEBOT_WEBHOOK` | 否 | `cmd/line` | Webhook path；預設 `/linebot/webhook` |
-| `GEMINI_API_KEY` 或 `GOOGLE_API_KEY` | 僅語音 | 範例 | Gemini TTS API key |
 
 Discord 若要取得一般訊息文字，請在 Developer Portal 啟用 **Message Content Intent**。
 
@@ -145,19 +141,19 @@ make line-send TEXT="hello"
 | API | 簽章／用途 |
 |---|---|
 | 建立 | `telegram.New(token, opts ...Option)` |
-| 訊息 | `Send`、`Delete`、`SendFile`、`SendPhoto`、`SendVoice` |
+| 訊息 | `Send`、`Delete`、`SendFile`、`SendPhoto`、`SendVoice(path)` |
 | 互動 | `SendInput`、`SendSelect`、`SendMultiSelect` |
 | 狀態 | `SendStatus`、`FinishStatus` |
-| 下載 | `Save(ctx, fileID, dir)` 或 `SaveFile`；20 MB 上限 |
+| 下載 | `Save(ctx, fileID, dir)`；20 MiB 上限 |
 
-`WithHTTPClient` 與 `WithPollTimeout` 用於設定 polling；`WithSendType` 可選 plain text、MarkdownV2 或 HTML。群組與超級群組訊息必須 mention bot 才會進入 reply handler。
+`WithHTTPClient` 與 `WithPollTimeout` 用於設定 polling；`WithSendType` 可選 plain text、MarkdownV2 或 HTML。`SendVoice` 上傳既有的 OGG/OPUS 檔案，音訊由呼叫端自行產生。
 
 ### Discord（`core/discord`）
 
 | API | 簽章／用途 |
 |---|---|
 | 建立 | `discord.New(token)` |
-| 訊息 | `Send`、`Delete`、`SendFiles`、`SendVoice` |
+| 訊息 | `Send`、`Delete`、`SendFiles`、`SendVoice(path)` |
 | 互動 | `SendInput`、`SendSelect`、`SendMultiSelect` |
 | 狀態 | `SendStatus`、`FinishStatus` |
 | 下載 | `Save(ctx, attachment, dir)`；25 MiB 上限 |
@@ -173,15 +169,7 @@ Discord 的輸入流程由按鈕開啟 Modal；選單會以 `Text` 回傳單選�
 | 下載 | `Save(ctx, messageID, dir)`；50 MiB 上限 |
 | Webhook path | `line.WithPath(path)` |
 
-LINE 處理 text、image、video、audio 與 file 事件；group / room 文字訊息必須 mention bot 的 user ID。刻意不提供互動元件。
-
-### 文字轉語音（`core/tts`）
-
-```go
-func Get(ctx context.Context, apiKey, text string) ([]byte, error)
-```
-
-`tts.Get` 向 Gemini 請求音訊，使用 `ffmpeg` 將 PCM 轉為 OGG/OPUS，並回傳編碼後 bytes。
+LINE 處理 text、image、video、audio 與 file 事件；刻意不提供互動元件。
 
 ***
 

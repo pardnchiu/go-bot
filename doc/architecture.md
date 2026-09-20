@@ -1,91 +1,93 @@
 # go-bot - Architecture
 
+Last updated: 2026-10-06
+
 > Back to [README](../README.md)
 
 ## Overview
 
-Platform adapters and shared TTS now live under `core/`. Applications import `github.com/pardnchiu/go-bot/core/<platform>` and keep the same `Reply` convention across packages.
+The three platform packages are independent and share no internal package. Only the `New`/`Start`/`Close`/`Status` lifecycle and the "`Reply(handler)` sends any non-empty return value" convention are common.
 
 ```mermaid
 graph TB
-    Client[Application] --> Core[core/]
-    Core --> Telegram[core/telegram]
-    Core --> Discord[core/discord]
-    Core --> Line[core/line]
-    Core --> TTS[core/tts]
-    Telegram --> TGSDK[go-telegram/bot]
-    Discord --> DGSDK[discordgo]
-    Line --> LNSDK[LINE Bot SDK]
-    Telegram --> TTS
-    Discord --> TTS
-    TTS --> Gemini[Gemini API]
-    TTS --> FFmpeg[ffmpeg]
+    App[Application] --> TG[core/telegram]
+    App --> DC[core/discord]
+    App --> LN[core/line]
+    TG --> TGSDK[go-telegram/bot]
+    DC --> DGSDK[bwmarrin/discordgo]
+    LN --> LNSDK[line-bot-sdk-go/v8 linebot]
+    TG --> PKG[go-pkg filesystem / utils]
+    DC --> PKG
+    LN --> PKG
+    TGSDK -->|long polling| TelegramAPI[Telegram Bot API]
+    DGSDK -->|WebSocket Gateway| DiscordAPI[Discord API]
+    LineAPI[LINE Platform] -->|HTTPS webhook| LN
 ```
 
 ## Module: core/telegram
 
-The Telegram adapter owns long-polling lifecycle, dispatches updates synchronously, gates group traffic behind bot mentions, and maps platform features to the package API.
+The Telegram adapter owns the long-polling lifecycle, dispatches updates synchronously, and provides interactions through inline keyboards and ForceReply.
 
 ```mermaid
 graph TB
-    Update[Telegram Update] --> Gate[Group mention gate]
-    Gate --> Dispatch[dispatch]
-    Dispatch --> Handler[ReplyHandler]
-    Handler --> Reply[SendMessage reply]
-    Dispatch --> Callback[Callback dispatch]
-    Callback --> Single[Single select]
-    Callback --> Multi[Multi-select state]
-    Bot[Bot lifecycle] --> Poll[Long polling]
-    Bot --> Status[Debounced status messages]
-    Bot --> Media[File and photo helpers]
+    subgraph telegram
+        Bot[Bot lifecycle] --> Poll[Long polling]
+        Poll --> Dispatch[dispatch]
+        Dispatch -->|Message| Handler[ReplyHandler]
+        Dispatch -->|CallbackQuery| Callback[dispatchCallback]
+        Callback -->|single pick| Handler
+        Callback -->|multi pick| Multi[multiSelects state]
+        Multi -->|done| Handler
+        Handler --> Reply[SendMessage reply]
+        Status[SendStatus / FinishStatus] --> Statuses[statuses per chat]
+        Media[Send / SendFile / SendPhoto / SendVoice] --> Upload[Streamed upload]
+        Save[Save] --> Disk[Atomic write with UUID name]
+    end
+    API[Telegram Bot API] --> Poll
 ```
 
 ## Module: core/discord
 
-The Discord adapter manages a Gateway session and uses Discord-native components for interaction flows.
+The Discord adapter manages the Gateway session and drives interactions with native Discord components.
 
 ```mermaid
 graph TB
-    Gateway[Discord Gateway event] --> Dispatch[Message dispatch]
-    Dispatch --> Handler[ReplyHandler]
-    Handler --> Reply[Channel message reply]
-    Component[Component interaction] --> Modal[Button to Modal]
-    Component --> Select[String select menu]
-    Modal --> Handler
-    Select --> Handler
-    Bot[Bot lifecycle] --> Status[Debounced channel status]
-    Bot --> Media[Attachments and voice]
+    subgraph discord
+        Bot[Bot lifecycle] --> Session[discordgo Session]
+        Session -->|MessageCreate| Dispatch[dispatch]
+        Session -->|InteractionCreate| Interaction[interactionDispatch]
+        Dispatch --> Handler[ReplyHandler]
+        Interaction -->|button| Modal[Open modal]
+        Interaction -->|modal submit| Inputs[inputs state]
+        Interaction -->|menu pick| Selects[selects state]
+        Inputs --> Handler
+        Selects --> Handler
+        Handler --> Reply[ChannelMessageSendReply]
+        Status[SendStatus / FinishStatus] --> Statuses[statuses per channel]
+        Save[Save] --> Disk[Atomic write with UUID name]
+    end
+    Gateway[Discord Gateway] --> Session
 ```
 
 ## Module: core/line
 
-The LINE adapter runs an inbound HTTP webhook server, gates group and room text messages behind bot mentions, and keeps the API surface limited to replies, push messages, and media persistence.
+The LINE adapter runs an inbound HTTP webhook server and limits its scope to replies, PushMessage, and media persistence.
 
 ```mermaid
 graph TB
-    LINE[LINE Platform] --> Webhook[HTTP webhook]
-    Webhook --> Parse[Signature-validated ParseRequest]
-    Parse --> Gate[Group/room mention gate]
-    Gate --> Event[Text or media event]
-    Event --> Profile[Best-effort profile lookup]
-    Profile --> Handler[ReplyHandler]
-    Handler --> Reply[Reply token response]
-    App[Application] --> Push[PushMessage]
-    Event --> Save[Media Save]
-```
-
-## Module: core/tts
-
-The TTS package converts a text request into audio bytes consumable by Telegram and Discord send helpers.
-
-```mermaid
-graph LR
-    Text[Text and API key] --> Request[Gemini generateContent]
-    Request --> PCM[PCM audio payload]
-    PCM --> Encode[ffmpeg libopus encoding]
-    Encode --> OGG[OGG/OPUS bytes]
-    OGG --> Telegram[Telegram SendVoice]
-    OGG --> Discord[Discord SendVoice]
+    subgraph line
+        Bot[Bot lifecycle] --> Server[http.Server]
+        Server --> Webhook[webhook handler]
+        Webhook --> Parse[ParseRequest signature check]
+        Parse -->|invalid signature| R400[400]
+        Parse --> Event[handleEvent 30s timeout]
+        Event --> Profile[displayName via profile API]
+        Profile --> Handler[ReplyHandler]
+        Handler --> Reply[ReplyMessage reply token]
+        Send[Send] --> Push[PushMessage]
+        Save[Save] --> Disk[Temp file stream + rename]
+    end
+    LINE[LINE Platform] --> Server
 ```
 
 ## Data Flow
@@ -94,27 +96,44 @@ graph LR
 sequenceDiagram
     participant User
     participant Platform
-    participant Adapter as core platform adapter
+    participant Adapter as core platform package
     participant Handler as ReplyHandler
-    User->>Platform: message or interaction
-    Platform->>Adapter: platform event
-    Adapter->>Handler: normalized Input
-    Handler-->>Adapter: reply string
-    alt reply is non-empty
-        Adapter->>Platform: reply to source message
+    User->>Platform: Message or interaction
+    Platform->>Adapter: Platform event
+    Adapter->>Adapter: Normalize into Input
+    Adapter->>Handler: handler(ctx, Input)
+    Handler-->>Adapter: Reply string (panics recovered)
+    alt Non-empty reply
+        Adapter->>Platform: Reply to source message
     end
 ```
 
 ## State Machine
 
+### Bot lifecycle
+
 ```mermaid
 stateDiagram-v2
     [*] --> Created: New
-    Created --> Running: Start
-    Running --> Running: dispatch events
-    Running --> Closing: Close
-    Closing --> Closed: resources released
+    Created --> Running: Start (token verified)
+    Created --> Created: Start fails
+    Running --> Running: Dispatch events
+    Running --> Closed: Close
     Closed --> [*]
+```
+
+### Status message (SendStatus / FinishStatus)
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Inflight: SendStatus (add reaction + post message)
+    Inflight --> Pending: SendStatus again within 1s
+    Pending --> Inflight: Timer fires edit
+    Inflight --> Idle: Request completes
+    Idle --> [*]: FinishStatus (clear reaction + delete message)
+    Inflight --> Finishing: FinishStatus
+    Finishing --> [*]: Clean up after request completes
 ```
 
 ***

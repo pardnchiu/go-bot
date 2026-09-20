@@ -1,15 +1,14 @@
 package telegram
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 
 	tgBot "github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
-
-	"github.com/pardnchiu/go-bot/core/tts"
 )
 
 type SendType int
@@ -106,16 +105,22 @@ func (b *Bot) Delete(ctx context.Context, chatID int64, msgID int) error {
 	return err
 }
 
-func (b *Bot) SendVoice(ctx context.Context, chatID int64, text, apiKey string, caption ...string) (*models.Message, error) {
-	ogg, err := tts.Get(ctx, apiKey, text)
-	if err != nil {
-		return nil, fmt.Errorf("github.com/pardnchiu/go-bot/core/tts Get: %w", err)
+func (b *Bot) SendVoice(ctx context.Context, chatID int64, path string, caption ...string) (*models.Message, error) {
+	if path == "" {
+		return nil, fmt.Errorf("path is required")
 	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("os.Open: %w", err)
+	}
+	defer file.Close()
+
 	params := &tgBot.SendVoiceParams{
 		ChatID: chatID,
 		Voice: &models.InputFileUpload{
-			Filename: "voice.ogg",
-			Data:     bytes.NewReader(ogg),
+			Filename: filepath.Base(path),
+			Data:     file,
 		},
 	}
 	if len(caption) > 0 {

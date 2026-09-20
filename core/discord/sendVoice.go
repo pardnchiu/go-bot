@@ -1,33 +1,33 @@
 package discord
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/bwmarrin/discordgo"
-
-	"github.com/pardnchiu/go-bot/core/tts"
 )
 
-func (b *Bot) SendVoice(ctx context.Context, channelID, replyTo, text, apiKey string, caption ...string) (*discordgo.Message, error) {
+func (b *Bot) SendVoice(ctx context.Context, channelID, replyTo, path string, caption ...string) (*discordgo.Message, error) {
 	if channelID == "" {
 		return nil, fmt.Errorf("channelID is required")
 	}
-	if text == "" {
-		return nil, fmt.Errorf("text is required")
+	if path == "" {
+		return nil, fmt.Errorf("path is required")
 	}
 
-	ogg, err := tts.Get(ctx, apiKey, text)
+	file, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("github.com/pardnchiu/go-bot/core/tts Get: %w", err)
+		return nil, fmt.Errorf("os.Open: %w", err)
 	}
+	defer file.Close()
 
 	data := &discordgo.MessageSend{
 		Files: []*discordgo.File{{
-			Name:        "voice.ogg",
+			Name:        filepath.Base(path),
 			ContentType: "audio/ogg",
-			Reader:      bytes.NewReader(ogg),
+			Reader:      file,
 		}},
 	}
 	if len(caption) > 0 {

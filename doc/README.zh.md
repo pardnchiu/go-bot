@@ -25,7 +25,7 @@
 
 > `go get github.com/pardnchiu/go-bot` · [完整文件](./doc.zh.md)
 
-- **core/ 套件版面** — Telegram、Discord、LINE 與 TTS 集中在 `core/`，平台 adapter 與文件共用同一 import 根。
+- **core/ 套件版面** — Telegram、Discord 與 LINE 集中在 `core/`，平台 adapter 與文件共用同一 import 根。
 - **原生平台生命週期** — Telegram long polling、Discord Gateway 與 LINE webhook 各自保留正確連線模型，並提供一致 Bot API。
 - **同步回覆契約** — 註冊單一 `Reply` handler，回傳非空字串時便自動回覆觸發訊息。
 - **互動元件整合** — Telegram 鍵盤與 ForceReply、Discord 選單與 Modal 都回到相同 handler 輸入模型。
@@ -41,9 +41,6 @@ graph TB
     Core --> TG[telegram]
     Core --> DC[discord]
     Core --> LN[line]
-    Core --> TTS[tts]
-    TG --> TTS
-    DC --> TTS
     TG --> TelegramAPI[Telegram API]
     DC --> DiscordAPI[Discord Gateway/API]
     LN --> LineAPI[LINE Webhook/API]

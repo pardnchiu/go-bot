@@ -3,19 +3,23 @@
 
 ***
 
-<p align="center"><strong>BUILD BOTS THAT FIT EVERY CHAT PLATFORM</strong></p>
+<p align="center">
+<strong>BUILD BOTS THAT FIT EVERY CHAT PLATFORM</strong>
+</p>
 
 <p align="center">
 <a href="https://pkg.go.dev/github.com/pardnchiu/go-bot"><img src="https://img.shields.io/badge/GO-REFERENCE-blue?include_prereleases&style=for-the-badge" alt="Go Reference"></a>
 <a href="https://github.com/pardnchiu/go-bot/releases"><img src="https://img.shields.io/github/v/tag/pardnchiu/go-bot?include_prereleases&style=for-the-badge" alt="Release"></a>
-<a href="../../LICENSE"><img src="https://img.shields.io/github/license/pardnchiu/go-bot?include_prereleases&style=for-the-badge" alt="License"></a>
+<a href="../LICENSE"><img src="https://img.shields.io/github/license/pardnchiu/go-bot?include_prereleases&style=for-the-badge" alt="License"></a>
+<a href="https://app.codecov.io/github/pardnchiu/go-bot/tree/master"><img src="https://img.shields.io/codecov/c/github/pardnchiu/go-bot/master?include_prereleases&style=for-the-badge" alt="Coverage"></a>
 </p>
 
 ***
 
-> Go 聊天機器人函式庫，以 core/ 統一版面，支援多平台原生互動與回覆
+> Go 語言多平台聊天機器人，具備 Telegram／Discord／LINE Bot、統一回覆與原生互動
 
 ## 目錄
+
 - [功能特點](#功能特點)
 - [架構](#架構)
 - [授權](#授權)
@@ -25,11 +29,11 @@
 
 > `go get github.com/pardnchiu/go-bot` · [完整文件](./doc.zh.md)
 
-- **core/ 套件版面** — Telegram、Discord 與 LINE 集中在 `core/`，平台 adapter 與文件共用同一 import 根。
-- **原生平台生命週期** — Telegram long polling、Discord Gateway 與 LINE webhook 各自保留正確連線模型，並提供一致 Bot API。
-- **同步回覆契約** — 註冊單一 `Reply` handler，回傳非空字串時便自動回覆觸發訊息。
-- **互動元件整合** — Telegram 鍵盤與 ForceReply、Discord 選單與 Modal 都回到相同 handler 輸入模型。
-- **媒體處理封裝** — 以串流上傳、大小上限、UUID 檔名與可取消 Context 處理各平台媒體。
+- **同步回覆契約** — 每個平台只需註冊一個 `Reply` handler，回傳非空字串即自動回覆到觸發訊息，panic 由 library 接住不會打掛連線。
+- **保留平台原生傳輸** — Telegram long polling 與 Discord Gateway 皆為 outbound 可在 NAT 後執行，LINE 則以內建 webhook server 驗簽接收，三者共用 `New`／`Start`／`Close` 生命週期。
+- **互動元件回流同一 handler** — Telegram inline keyboard 與 ForceReply、Discord 下拉選單與「按鈕 → Modal」流程，使用者的選擇與輸入都以 `Input` 送回原本的 handler。
+- **去彈跳「思考中」狀態訊息** — `SendStatus` 在原訊息加 reaction 並以每秒最多一次的頻率編輯同一則狀態訊息，`FinishStatus` 一次清除 reaction 與訊息，避開平台 rate limit。
+- **有上限的媒體落地** — 附件下載依平台套用 20／25／50 MiB 上限並以 UUID 檔名原子寫入，上傳則以檔案串流送出。
 
 ## 架構
 
@@ -37,13 +41,15 @@
 
 ```mermaid
 graph TB
-    App[應用程式] --> Core[core/]
-    Core --> TG[telegram]
-    Core --> DC[discord]
-    Core --> LN[line]
-    TG --> TelegramAPI[Telegram API]
-    DC --> DiscordAPI[Discord Gateway/API]
-    LN --> LineAPI[LINE Webhook/API]
+    App[應用程式] --> TG[core/telegram]
+    App --> DC[core/discord]
+    App --> LN[core/line]
+    TG -->|long polling| TelegramAPI[Telegram Bot API]
+    DC -->|WebSocket Gateway| DiscordAPI[Discord API]
+    LineAPI[LINE 平台] -->|HTTPS webhook| LN
+    TG --> Handler[ReplyHandler]
+    DC --> Handler
+    LN --> Handler
 ```
 
 ## 授權
@@ -52,12 +58,11 @@ graph TB
 
 ## Author
 
-<img src="https://github.com/pardnchiu.png" align="left" width="96" height="96" style="margin-right: 0.5rem;">
+Just [open an issue](https://github.com/pardnchiu/go-bot/issues/new) to share an idea.
 
-<h4 style="padding-top: 0">邱敬幃 Pardn Chiu</h4>
-
-<a href="mailto:hi@pardn.io">hi@pardn.io</a><br>
-<a href="https://www.linkedin.com/in/pardnchiu">https://www.linkedin.com/in/pardnchiu</a>
+<a href="https://github.com/pardnchiu/go-bot/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=pardnchiu/go-bot&cache_bust=2026-10-06" alt="go-bot contributors" />
+</a>
 
 ***
 

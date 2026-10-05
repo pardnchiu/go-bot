@@ -4,29 +4,29 @@
 
 ## 前置需求
 
-- Go 1.25.0 或更新版本。
-- 使用的 Bot 平台憑證：Telegram、Discord 或 LINE。
-- LINE webhook 需要公開 HTTPS endpoint；Telegram 與 Discord 為 outbound 連線，可在 NAT 後執行。
+- Go 1.25.0 以上
+- 至少一個平台的 bot 憑證：Telegram bot token、Discord bot token，或 LINE channel secret + channel access token
+- 使用 LINE 時需可公開存取的 HTTPS endpoint（本機測試可用 ngrok 等反向代理）；Telegram 與 Discord 皆為 outbound 連線，可在 NAT 後執行
 
 ## 安裝
 
-### 加入 Go module
+### 以 go get 加入模組
 
 ```bash
 go get github.com/pardnchiu/go-bot
 ```
 
-平台套件改從 `core/` 匯入：
+依需要的平台 import `core/` 下的套件：
 
 ```go
 import (
-    "github.com/pardnchiu/go-bot/core/telegram"
     "github.com/pardnchiu/go-bot/core/discord"
     "github.com/pardnchiu/go-bot/core/line"
+    "github.com/pardnchiu/go-bot/core/telegram"
 )
 ```
 
-### 建置內附契約範例
+### 從原始碼建置
 
 ```bash
 git clone https://github.com/pardnchiu/go-bot.git
@@ -36,25 +36,17 @@ go build ./...
 
 ## 設定
 
-範例透過 Make 直接 include `.env`。值不可加引號，且不可提交此檔案。
+本函式庫不讀取環境變數，所有憑證皆由 caller 傳入建構函式。各平台需在開發者後台完成下列設定：
 
-| 變數 | 必要 | 使用處 | 說明 |
-|---|---:|---|---|
-| `TELEGRAM_TOKEN` | 僅 Telegram | `cmd/tg` | Telegram Bot token |
-| `TELEGRAM_CHAT_ID` | 傳送範例 | `cmd/tg` | 目標 chat ID |
-| `DISCORD_TOKEN` | 僅 Discord | `cmd/dc` | Discord Bot token |
-| `DISCORD_CHANNEL_ID` | 傳送範例 | `cmd/dc` | 目標 channel ID |
-| `LINEBOT_SECRET` | 僅 LINE | `cmd/line` | LINE channel secret |
-| `LINEBOT_TOKEN` | 僅 LINE | `cmd/line` | LINE channel access token |
-| `LINEBOT_TO` | LINE 傳送 | `cmd/line` | User、group 或 room target ID |
-| `LINEBOT_PORT` | 否 | `cmd/line` | Webhook port；預設 `16722` |
-| `LINEBOT_WEBHOOK` | 否 | `cmd/line` | Webhook path；預設 `/linebot/webhook` |
-
-Discord 若要取得一般訊息文字，請在 Developer Portal 啟用 **Message Content Intent**。
+| 平台 | 設定 | 為何 |
+|---|---|---|
+| Telegram | 無 webhook 綁定（`Start` 若偵測到 webhook 會自動刪除） | long polling 與 webhook 互斥 |
+| Discord | Developer Portal → Bot → 開啟 **Message Content Intent** | 未開啟時 `Input.Text` 只在 mention／DM 有值 |
+| LINE | Developer Console → Messaging API → Webhook URL 填入 `https://<host><path>` 並啟用 | LINE 以 webhook 推送事件，預設 path 為 `/linebot/webhook` |
 
 ## 使用方式
 
-### 基本 Telegram 回覆 Bot
+### 基礎：Telegram 回覆機器人
 
 ```go
 package main
@@ -62,13 +54,18 @@ package main
 import (
     "context"
     "log"
+    "os"
+    "os/signal"
+    "syscall"
 
     "github.com/pardnchiu/go-bot/core/telegram"
 )
 
 func main() {
-    ctx := context.Background()
-    bot, err := telegram.New("<telegram-token>")
+    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    bot, err := telegram.New(os.Getenv("TELEGRAM_TOKEN"))
     if err != nil {
         log.Fatal(err)
     }
@@ -77,14 +74,15 @@ func main() {
     bot.Reply(func(ctx context.Context, in telegram.Input) string {
         return "echo: " + in.Text
     })
+
     if err := bot.Start(ctx); err != nil {
         log.Fatal(err)
     }
-    select {}
+    <-ctx.Done()
 }
 ```
 
-### Discord 互動與附件處理
+### 基礎：LINE webhook 機器人
 
 ```go
 package main
@@ -92,84 +90,194 @@ package main
 import (
     "context"
     "log"
+    "os"
+    "os/signal"
+    "syscall"
+
+    "github.com/pardnchiu/go-bot/core/line"
+)
+
+func main() {
+    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    bot, err := line.New(os.Getenv("LINEBOT_SECRET"), os.Getenv("LINEBOT_TOKEN"), "16722")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer bot.Close()
+
+    bot.Reply(func(ctx context.Context, in line.Input) string {
+        if in.MessageType != "text" {
+            return ""
+        }
+        return "you said: " + in.Text
+    })
+
+    if err := bot.Start(ctx); err != nil {
+        log.Fatal(err)
+    }
+    <-ctx.Done()
+}
+```
+
+### 進階：Discord 附件落地與下拉選單
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "os"
+    "os/signal"
+    "strings"
+    "syscall"
 
     "github.com/pardnchiu/go-bot/core/discord"
 )
 
 func main() {
-    ctx := context.Background()
-    bot, err := discord.New("<discord-token>")
+    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    bot, err := discord.New(os.Getenv("DISCORD_TOKEN"))
     if err != nil {
         log.Fatal(err)
     }
     defer bot.Close()
 
     bot.Reply(func(ctx context.Context, in discord.Input) string {
-        for _, attachment := range in.Attachments {
-            if _, err := bot.Save(ctx, attachment, "./tmp"); err != nil {
-                return "could not save attachment"
+        // 多選結果走 CallbackPicks
+        if len(in.CallbackPicks) > 0 {
+            return "picked: " + strings.Join(in.CallbackPicks, ", ")
+        }
+        // 附件逐一落地，回傳本機路徑
+        for _, att := range in.Attachments {
+            if _, err := bot.Save(ctx, att, "./tmp"); err != nil {
+                return "save failed: " + err.Error()
             }
+        }
+        if in.Text == "color" {
+            if _, err := bot.SendMultiSelect(ctx, in.ChannelID, in.MessageID, "選顏色（可多選）", []string{"紅", "綠", "藍"}); err != nil {
+                log.Println(err)
+            }
+            return ""
         }
         return "echo: " + in.Text
     })
+
     if err := bot.Start(ctx); err != nil {
         log.Fatal(err)
     }
-    select {}
+    <-ctx.Done()
 }
 ```
 
-### 執行契約範例
+### 進階：思考中狀態訊息
 
-```bash
-make listen
-make send TEXT="hello"
-make dc-bot
-make dc-send TEXT="hello"
-make line-listen
-make line-send TEXT="hello"
+```go
+bot.Reply(func(ctx context.Context, in telegram.Input) string {
+    // 首次呼叫在原訊息加 reaction 並送出狀態訊息；之後編輯同一則訊息（1 秒去彈跳）
+    if err := bot.SendStatus(ctx, in.ChatID, in.MessageID, "思考中...", telegram.WithStatusEmoji("👀")); err != nil {
+        log.Println(err)
+    }
+    for i := 1; i <= 3; i++ {
+        time.Sleep(time.Second)
+        _ = bot.SendStatus(ctx, in.ChatID, in.MessageID, fmt.Sprintf("步驟 %d/3", i))
+    }
+    // 清除 reaction 並刪除狀態訊息
+    if err := bot.FinishStatus(ctx, in.ChatID); err != nil {
+        log.Println(err)
+    }
+    return "完成"
+})
 ```
 
 ## API 參考
 
 ### 共通慣例
 
-`core/` 下每個平台都提供 `New`、`Start`、`Close`、`Status` 與 `Reply`。`Reply` 接受同步 handler，非空回傳值會送回來源對話；`Close` 可重複呼叫。
+`core/telegram`、`core/discord`、`core/line` 各自宣告 `Bot`、`Input`、`ReplyHandler`、`Status`，對外一致的只有下列生命週期與回覆慣例：
+
+| 方法 | 行為 |
+|---|---|
+| `New(...)` | 驗證必填參數並建立 client，不建立連線 |
+| `Start(ctx)` | 先以 API 驗證 token（失敗即回 error），再啟動 polling／Gateway／webhook server |
+| `Close()` | 取消內部 context、關閉連線並清除互動與狀態訊息 state；冪等 |
+| `Status()` | 回傳目前執行狀態與 bot 身分 |
+| `Reply(handler)` | 註冊 `func(ctx, Input) string`；回傳非空字串即回覆觸發訊息，handler panic 會被 recover |
 
 ### Telegram（`core/telegram`）
 
-| API | 簽章／用途 |
-|---|---|
-| 建立 | `telegram.New(token, opts ...Option)` |
-| 訊息 | `Send`、`Delete`、`SendFile`、`SendPhoto`、`SendVoice(path)` |
-| 互動 | `SendInput`、`SendSelect`、`SendMultiSelect` |
-| 狀態 | `SendStatus`、`FinishStatus` |
-| 下載 | `Save(ctx, fileID, dir)`；20 MiB 上限 |
+```go
+func New(token string, opts ...Option) (*Bot, error)
+func WithHTTPClient(client *http.Client) Option
+func WithPollTimeout(d time.Duration) Option
+```
 
-`WithHTTPClient` 與 `WithPollTimeout` 用於設定 polling；`WithSendType` 可選 plain text、MarkdownV2 或 HTML。`SendVoice` 上傳既有的 OGG/OPUS 檔案，音訊由呼叫端自行產生。
+`WithPollTimeout` 為 `getUpdates` 的 server 端 timeout；`WithHTTPClient` 的 `Timeout` 必須大於 poll timeout，否則閒置的 long poll 會在 server 回應前被中止。
+
+| 方法 | 簽名 | 說明 |
+|---|---|---|
+| `Send` | `(ctx, chatID int64, replyTo int, text string, opts ...MessageOption) (*models.Message, error)` | 送文字；`replyTo > 0` 掛回覆對象 |
+| `Delete` | `(ctx, chatID int64, msgID int) error` | 刪除訊息 |
+| `SendFile` | `(ctx, chatID int64, fileType FileType, path string, caption ...string) (*models.Message, error)` | `TypeDocument`／`TypeVideo`／`TypeAudio`，串流上傳 |
+| `SendPhoto` | `(ctx, chatID int64, paths []string, caption ...string) ([]*models.Message, error)` | 1 張走單張 API、2–10 張走 album |
+| `SendVoice` | `(ctx, chatID int64, path string, caption ...string) (*models.Message, error)` | 上傳既有 OGG/OPUS 檔為語音訊息 |
+| `SendInput` | `(ctx, chatID int64, replyTo int, text string, opts ...MessageOption) (*models.Message, error)` | 以 ForceReply 要求使用者回覆 |
+| `SendSelect` | `(ctx, chatID int64, replyTo int, text string, items []string, opts ...MessageOption) (*models.Message, error)` | inline keyboard 單選，結果在 `Input.CallbackData` |
+| `SendMultiSelect` | `(ctx, chatID int64, replyTo int, text string, items []string, opts ...MessageOption) (*models.Message, error)` | ✅／⬜ 切換 + 完成按鈕，結果在 `Input.CallbackPicks` |
+| `SendStatus` | `(ctx, chatID int64, replyTo int, text string, opts ...StatusOption) error` | 每 chat 一則狀態訊息，1 秒去彈跳 |
+| `FinishStatus` | `(ctx, chatID int64) error` | 清除 reaction 並刪除狀態訊息 |
+| `Save` | `(ctx, fileID, dir string) (string, error)` | 下載檔案到 `dir`，上限 20 MiB，回傳路徑 |
+
+| 選項 | 說明 |
+|---|---|
+| `WithSendType(TypeMarkdown \| TypeHTML)` | `MessageOption`；設定 ParseMode，未指定為純文字 |
+| `WithStatusEmoji(emoji)` | `StatusOption`；reaction emoji，預設 `🤔` |
+| `WithStatusSendType(t)` | `StatusOption`；狀態訊息的 ParseMode |
+
+`Input` 欄位：`ChatID`、`ChatName`、`MessageID`、`UserID`、`Username`、`Text`、`Caption`、`Photo`、`Document`、`CallbackData`、`CallbackPicks`、`Raw *models.Update`。
 
 ### Discord（`core/discord`）
 
-| API | 簽章／用途 |
-|---|---|
-| 建立 | `discord.New(token)` |
-| 訊息 | `Send`、`Delete`、`SendFiles`、`SendVoice(path)` |
-| 互動 | `SendInput`、`SendSelect`、`SendMultiSelect` |
-| 狀態 | `SendStatus`、`FinishStatus` |
-| 下載 | `Save(ctx, attachment, dir)`；25 MiB 上限 |
+```go
+func New(token string) (*Bot, error)
+```
 
-Discord 的輸入流程由按鈕開啟 Modal；選單會以 `Text` 回傳單選結果，或以 `CallbackPicks` 回傳多選結果。
+| 方法 | 簽名 | 說明 |
+|---|---|---|
+| `Send` | `(ctx, channelID, replyTo, text string) (*discordgo.Message, error)` | 送文字；`replyTo != ""` 掛回覆對象 |
+| `Delete` | `(ctx, channelID, messageID string) error` | 刪除訊息 |
+| `SendFiles` | `(ctx, channelID, replyTo string, paths []string, caption ...string) (*discordgo.Message, error)` | 單則訊息 1–10 個附件 |
+| `SendVoice` | `(ctx, channelID, replyTo, path string, caption ...string) (*discordgo.Message, error)` | 上傳 OGG 為 audio 附件（非波形語音泡泡） |
+| `SendInput` | `(ctx, channelID, replyTo, prompt string) (*discordgo.Message, error)` | 「回答」按鈕開啟 Modal，填入值在 `Input.Text` |
+| `SendSelect` | `(ctx, channelID, replyTo, text string, items []string) (*discordgo.Message, error)` | 下拉單選（1–25 項），結果在 `Input.Text` |
+| `SendMultiSelect` | `(ctx, channelID, replyTo, text string, items []string) (*discordgo.Message, error)` | 下拉多選，結果在 `Input.CallbackPicks` |
+| `SendStatus` | `(ctx, channelID, replyTo, text string, opts ...StatusOption) error` | 每 channel 一則狀態訊息，1 秒去彈跳 |
+| `FinishStatus` | `(ctx, channelID string) error` | 清除 reaction 並刪除狀態訊息 |
+| `Save` | `(ctx, att *discordgo.MessageAttachment, dir string) (string, error)` | 下載附件到 `dir`，上限 25 MiB，回傳路徑 |
+
+`WithStatusEmoji(emoji)` 設定 reaction emoji，預設 `🤔`。
+
+`Input` 欄位：`ChannelID`、`ChannelName`、`GuildID`、`MessageID`、`UserID`、`Username`、`Text`、`Attachments`、`CallbackPicks`、`Raw *discordgo.MessageCreate`。互動事件中 `MessageID` 為 prompt 訊息 ID，可直接傳給 `Delete` 清除。
 
 ### LINE（`core/line`）
 
-| API | 簽章／用途 |
-|---|---|
-| 建立 | `line.New(secret, token, port, opts ...Option)` |
-| 訊息 | `Send(ctx, to, text)` 使用 PushMessage |
-| 下載 | `Save(ctx, messageID, dir)`；50 MiB 上限 |
-| Webhook path | `line.WithPath(path)` |
+```go
+func New(secret, token, port string, opts ...Option) (*Bot, error)
+func WithPath(path string) Option
+```
 
-LINE 處理 text、image、video、audio 與 file 事件；刻意不提供互動元件。
+webhook server 監聽 `:<port>`，path 預設 `/linebot/webhook`。簽章錯誤回 400、未啟動回 503，每個事件 handler 有 30 秒 timeout。
+
+| 方法 | 簽名 | 說明 |
+|---|---|---|
+| `Send` | `(ctx, to, text string) (*linebot.BasicResponse, error)` | PushMessage 到 user／group／room |
+| `Save` | `(ctx, messageID, dir string) (string, error)` | 下載 image／video／audio／file 內容，上限 50 MiB，副檔名依 content-type 推斷 |
+
+`Input` 欄位：`SourceType`、`UserID`、`Username`、`GroupID`、`RoomID`、`ReplyToken`、`MessageID`、`MessageType`（`text`／`image`／`video`／`audio`／`file`）、`Text`、`FileName`、`Raw *linebot.Event`。`Username` 每則訊息以 profile API 取得，失敗時為空字串。LINE 不提供互動元件與狀態訊息。
 
 ***
 

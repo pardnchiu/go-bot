@@ -1,5 +1,7 @@
 # go-bot - Documentation
 
+Last updated: 2026-10-06
+
 > Back to [README](../README.md)
 
 ## Prerequisites
